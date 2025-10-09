@@ -1,16 +1,21 @@
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0a0f1f"/>
   <title>Verified CryptoBro Hub</title>
 
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@300;500;700&display=swap" rel="stylesheet"/>
 
   <!-- Marked (Markdown → HTML) + DOMPurify (sanitize) -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 
   <style>
     :root{
@@ -28,7 +33,287 @@
     /* Top bar (mobile) */
     .topbar{
       display:none;position:sticky;top:0;z-index:50;
-      background:linear-gradient(145deg, rgba(11,11,25,
+      background:linear-gradient(145deg, rgba(11,11,25,0.95), rgba(10,10,35,0.88));
+      backdrop-filter: blur(6px);
+      border-bottom:1px solid var(--border);
+      padding:10px 14px;
+      align-items:center;justify-content:space-between
+    }
+    .brand{display:flex;gap:10px;align-items:center}
+    .brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent1),var(--accent2));box-shadow:0 0 10px var(--glow)}
+    .brand span{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.5px}
 
+    .menu-btn{
+      appearance:none;border:1px solid var(--border);background:#0d1323;color:#fff;
+      padding:8px 12px;border-radius:10px;display:inline-flex;align-items:center;gap:8px;
+      box-shadow:0 0 12px rgba(0,0,0,.2)
+    }
 
+    /* Hero */
+    .hero{padding:40px 16px 0;text-align:center}
+    .hero img{width:100%;max-width:1200px;height:auto;border-radius:12px;box-shadow:0 0 40px var(--glow)}
+    h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.6rem,2.5vw,2.4rem);margin:14px 0 6px;color:#bba7ff;text-shadow:0 0 18px var(--glow)}
+    .subtitle{color:#a3bffa;margin:0 auto;max-width:960px;padding:0 12px}
 
+    /* Nav pills */
+    .pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px auto 6px;padding:0 10px}
+    .pill{display:inline-block;padding:10px 18px;border-radius:999px;text-decoration:none;color:#fff;background:linear-gradient(90deg,var(--accent1),var(--accent2));box-shadow:0 0 18px var(--glow);font-weight:600}
+
+    /* Layout */
+    .container{max-width:1200px;margin:28px auto;padding:0 16px;display:grid;grid-template-columns:280px 1fr;gap:18px}
+    main, aside{background:var(--card);border:1px solid var(--border);border-radius:14px}
+    aside{padding:14px 12px;position:sticky;top:16px;height:max-content}
+    main{padding:clamp(16px,2.2vw,22px);min-height:40vh}
+
+    /* Sidebar */
+    .side-title{font-family:'Orbitron',sans-serif;font-size:1rem;color:#a78bfa;margin:4px 12px 10px}
+    .side-group{margin:10px 0 14px}
+    .side-link{display:block;color:var(--text);text-decoration:none;padding:10px 12px;border-radius:10px}
+    .side-link:hover{background:#0f1627}
+    .active{background:linear-gradient(90deg,rgba(59,130,246,.18),rgba(139,92,246,.18))}
+
+    /* Markdown content tweaks */
+    main h1, main h2, main h3{font-family:'Orbitron',sans-serif}
+    main table{width:100%;border-collapse:collapse;margin:16px 0;overflow:auto;display:block}
+    main th, main td{border:1px solid var(--border);padding:10px;vertical-align:top}
+    main img{max-width:100%;height:auto;border-radius:10px}
+    main code{background:#0e1422;padding:2px 6px;border-radius:6px}
+    main pre{background:#0e1422;padding:14px;border-radius:10px;overflow:auto}
+
+    /* Footer */
+    footer{max-width:1200px;margin:24px auto 60px;padding:0 16px;color:var(--muted);text-align:center}
+    footer a{color:#bba7ff}
+
+    /* Mobile / Tablet */
+    @media (max-width:1000px){
+      .container{grid-template-columns:1fr}
+      aside{position:fixed;left:0;right:0;bottom:0;transform:translateY(110%);transition:transform .25s ease;z-index:40;border-radius:14px 14px 0 0}
+      aside.open{transform:translateY(0)}
+      .topbar{display:flex}
+      .hero{padding-top:16px}
+      .pills .pill{padding:9px 14px}
+      .subtitle{font-size:.98rem}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MOBILE TOP BAR -->
+  <div class="topbar" role="navigation" aria-label="Mobile Navigation">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <span>Verified CryptoBro Hub</span>
+    </div>
+    <button class="menu-btn" id="menuToggle" aria-expanded="false" aria-controls="sidebar">☰ Menu</button>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <img loading="lazy" src="https://dummyimage.com/1200x280/0a0f1f/89faff&text=Verified+CryptoBro+Hub" alt="Verified CryptoBro Hub — Banner">
+    <h1>🪂 Verified CryptoBro Hub</h1>
+    <p class="subtitle">Trusted links to <b>authentic airdrops</b>, plus the <b>people</b>, <b>tools</b>, and <b>ecosystems</b> every <b>CryptoBro</b> should follow.</p>
+    <div class="pills" role="navigation" aria-label="Quick navigation">
+      <a class="pill" href="#page=README">🏠 Home</a>
+      <a class="pill" href="#page=verified-list">✅ Verified Airdrops</a>
+      <a class="pill" href="#page=monad">🟣 Monad</a>
+      <a class="pill" href="#page=optimism">🔴 Optimism</a>
+      <a class="pill" href="#page=base">🔵 Base</a>
+      <a class="pill" href="#page=ink">⚫ Ink</a>
+    </div>
+    <p><small>Community-maintained. No seed phrases. No private keys. DYOR.</small></p>
+  </div>
+
+  <!-- LAYOUT -->
+  <div class="container">
+    <aside id="sidebar" aria-label="Side navigation">
+      <div class="side-title">Navigation</div>
+      <div class="side-group">
+        <a class="side-link" data-route="README" href="#page=README">🏠 Overview</a>
+        <a class="side-link" data-route="verified-list" href="#page=verified-list">✅ Verified Airdrops</a>
+      </div>
+
+      <div class="side-title">Ecosystem Guides</div>
+      <div class="side-group">
+        <a class="side-link" data-route="monad" href="#page=monad">🟣 Monad Guide</a>
+        <a class="side-link" data-route="optimism" href="#page=optimism">🔴 Optimism Guide</a>
+        <a class="side-link" data-route="base" href="#page=base">🔵 Base Guide</a>
+        <a class="side-link" data-route="ink" href="#page=ink">⚫ Ink Guide</a>
+      </div>
+
+      <div class="side-title">Follow & Builders</div>
+      <div class="side-group">
+        <a class="side-link" data-route="README#-wallet--portfolio-trackers" href="#page=README&anchor=%F0%9F%93%8A%20Wallet%20%26%20Portfolio%20Trackers">📊 Wallet Trackers</a>
+        <a class="side-link" data-route="README#️-essential-security-tools" href="#page=README&anchor=%F0%9F%9B%A0%EF%B8%8F%20Essential%20Security%20Tools">🛠️ Security Tools</a>
+        <a class="side-link" data-route="README#-airdrop-influencers-x--twitter" href="#page=README&anchor=%F0%9F%91%A5%20Airdrop%20Influencers%20(X%20%2F%20Twitter)">👥 Influencers</a>
+        <a class="side-link" data-route="README#-airdrop-builders-github" href="#page=README&anchor=%F0%9F%92%BB%20Airdrop%20Builders%20(GitHub)">💻 Builders</a>
+      </div>
+    </aside>
+
+    <main id="content" role="main" aria-live="polite">
+      <p>Loading…</p>
+      <noscript>
+        <p><strong>JavaScript is disabled.</strong> Open the markdown pages directly:</p>
+        <ul>
+          <li><a href="./README.md">README.md</a></li>
+          <li><a href="./verified-list.md">verified-list.md</a></li>
+          <li><a href="./monad.md">monad.md</a></li>
+          <li><a href="./optimism.md">optimism.md</a></li>
+          <li><a href="./base.md">base.md</a></li>
+          <li><a href="./ink.md">ink.md</a></li>
+        </ul>
+      </noscript>
+    </main>
+  </div>
+
+  <footer>
+    <p>
+      Built and Powered by <a href="https://github.com/benoit80000">benoit80000</a> · 
+      Follow <a href="https://x.com/Funky80310">@Funky80310</a>
+    </p>
+  </footer>
+
+  <script>
+    // -------- SETTINGS (valeurs forcées) --------
+    var username = 'benoit80000';
+    var repo     = 'benoit80000.github.io';
+    var branch   = 'main';
+    var RAW_BASE = 'https://raw.githubusercontent.com/' + username + '/' + repo + '/' + branch + '/';
+
+    // Routes: "page" → fichier .md à la racine
+    var ROUTES = {
+      'README':        'README.md',
+      'verified-list': 'verified-list.md',
+      'monad':         'monad.md',
+      'optimism':      'optimism.md',
+      'base':          'base.md',
+      'ink':           'ink.md'
+    };
+
+    function getHashParams(){
+      var h = location.hash.replace(/^#/, '');
+      var obj = {};
+      if(!h) return obj;
+      h.split('&').forEach(function(kv){
+        if(!kv) return;
+        var parts = kv.split('=');
+        var k = decodeURIComponent(parts[0]||'');
+        var v = decodeURIComponent(parts[1]||'');
+        obj[k]=v;
+      });
+      return obj;
+    }
+
+    function setActive(route){
+      var links = document.querySelectorAll('.side-link');
+      for(var i=0;i<links.length;i++){ links[i].classList.remove('active'); }
+      var el = document.querySelector('.side-link[data-route="' + route + '"]');
+      if(el) el.classList.add('active');
+    }
+
+    function hijackLinks(container){
+      var anchors = container.querySelectorAll('a[href]');
+      for(var i=0;i<anchors.length;i++){
+        (function(a){
+          var href = a.getAttribute('href'); if(!href) return;
+          try{
+            var url = new URL(href, location.href);
+            var isSameOrigin = (url.origin === location.origin);
+            var isRelativeMd = (/\.md(#.*)?$/).test(href) && !(/^https?:\/\//).test(href);
+
+            if(isSameOrigin && (/\.md$/).test(url.pathname)){
+              a.addEventListener('click', function(e){
+                e.preventDefault();
+                var name = url.pathname.split('/').pop().replace(/\.md$/,'');
+                location.hash = 'page=' + encodeURIComponent(name);
+              });
+            } else if(isRelativeMd){
+              a.addEventListener('click', function(e){
+                e.preventDefault();
+                var file   = href.split('#')[0];
+                var name   = file.replace(/^\.\//,'').replace(/\.md$/,'');
+                var anchor = href.indexOf('#')>-1 ? href.split('#').slice(1).join('#') : '';
+                location.hash = 'page=' + encodeURIComponent(name) + (anchor ? '&anchor=' + encodeURIComponent(anchor) : '');
+              });
+            }
+          }catch(e){}
+        })(anchors[i]);
+      }
+    }
+
+    function loadMarkdown(file){
+      var url = RAW_BASE + file;
+      return fetch(url, {cache:'no-cache'}).then(function(res){
+        if(!res.ok) throw new Error('Cannot load ' + file + ': HTTP ' + res.status);
+        return res.text();
+      });
+    }
+
+    function scrollToAnchor(anchor){
+      if(!anchor) return;
+      var id = decodeURIComponent(anchor);
+      var el = document.getElementById(id) || document.querySelector('[id="' + CSS.escape(anchor) + '"]');
+      if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+    }
+
+    function bootApp(){
+      var contentEl  = document.getElementById('content');
+      var sidebarEl  = document.getElementById('sidebar');
+      var menuToggle = document.getElementById('menuToggle');
+
+      if(menuToggle){
+        menuToggle.addEventListener('click', function(){
+          if(!sidebarEl) return;
+          sidebarEl.classList.toggle('open');
+          var expanded = sidebarEl.classList.contains('open');
+          menuToggle.setAttribute('aria-expanded', String(!!expanded));
+        });
+      }
+
+      function render(){
+        var params = getHashParams();
+        var page   = params.page || 'README';
+        var anchor = params.anchor || '';
+        var route  = page.replace(/\.md$/,'');
+        var file   = ROUTES[route] || ROUTES['README'];
+
+        setActive(route);
+        contentEl.innerHTML = '<p>Loading <code>'+file+'</code>…</p>';
+
+        loadMarkdown(file).then(function(md){
+          if(typeof marked !== 'undefined'){
+            marked.setOptions({ headerIds: true, mangle: false });
+            var dirtyHtml = marked.parse(md);
+            var cleanHtml = (typeof DOMPurify!=='undefined') ? DOMPurify.sanitize(dirtyHtml) : dirtyHtml;
+            contentEl.innerHTML = cleanHtml;
+          } else {
+            contentEl.textContent = md; // fallback: show raw markdown
+          }
+
+          hijackLinks(contentEl);
+          if(anchor){ setTimeout(function(){ scrollToAnchor(anchor); }, 50); }
+
+          if(window.innerWidth <= 1000 && sidebarEl){
+            sidebarEl.classList.remove('open');
+            if(menuToggle) menuToggle.setAttribute('aria-expanded','false');
+          }
+        }).catch(function(err){
+          console.error(err);
+          var safeErr = (typeof DOMPurify!=='undefined') ? DOMPurify.sanitize(String(err)) : String(err);
+          contentEl.innerHTML =
+            '<h2>Page not found</h2>' +
+            '<p>The file <code>'+file+'</code> was not found at the repository root on branch <code>'+branch+'</code>.</p>' +
+            '<p>Make sure the file exists or update the <code>ROUTES</code> map in <code>index.html</code>.</p>' +
+            '<p><a href="#page=README">← Back to Home</a></p>' +
+            '<pre style="background:#0e1422;padding:12px;border-radius:8px">'+ safeErr +'</pre>';
+        });
+      }
+
+      window.addEventListener('hashchange', render);
+      render();
+    }
+
+    // S'assure que les libs sont chargées (defer) avant boot
+    document.addEventListener('DOMContentLoaded', function(){ bootApp(); });
+  </script>
+</body>
+</html>
