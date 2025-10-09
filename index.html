@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Verified CryptoBro Hub</title>
 
   <!-- Fonts -->
@@ -19,216 +19,16 @@
       --card:#0b0f1a;--border:rgba(255,255,255,.08)
     }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{
       margin:0;font-family:'Inter',sans-serif;background:radial-gradient(circle at 20% 20%,var(--bg2),var(--bg) 70%);
-      color:var(--text);line-height:1.65
-    }
-    /* Hero */
-    .hero{padding:40px 16px 0;text-align:center}
-    .hero img{max-width:100%;border-radius:12px;box-shadow:0 0 40px var(--glow)}
-    h1{font-family:'Orbitron',sans-serif;font-size:2.25rem;margin:14px 0 6px;color:#bba7ff;text-shadow:0 0 18px var(--glow)}
-    .subtitle{color:#a3bffa}
-    /* Nav pills */
-    .pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px auto 6px}
-    .pill{display:inline-block;padding:10px 18px;border-radius:999px;text-decoration:none;color:#fff;background:linear-gradient(90deg,var(--accent1),var(--accent2));box-shadow:0 0 18px var(--glow);font-weight:600}
-    /* Layout */
-    .container{max-width:1100px;margin:28px auto;padding:0 16px;display:grid;grid-template-columns:280px 1fr;gap:18px}
-    @media (max-width:1000px){.container{grid-template-columns:1fr}}
-    aside{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 12px}
-    main{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
-    /* Sidebar */
-    .side-title{font-family:'Orbitron',sans-serif;font-size:1rem;color:#a78bfa;margin:4px 12px 10px}
-    .side-group{margin:10px 0 14px}
-    .side-link{display:block;color:var(--text);text-decoration:none;padding:10px 12px;border-radius:10px}
-    .side-link:hover{background:#0f1627}
-    .active{background:linear-gradient(90deg,rgba(59,130,246,.18),rgba(139,92,246,.18))}
-    /* Markdown content tweaks */
-    main h1, main h2, main h3{font-family:'Orbitron',sans-serif}
-    main table{width:100%;border-collapse:collapse;margin:16px 0}
-    main th, main td{border:1px solid var(--border);padding:10px;vertical-align:top}
-    main code{background:#0e1422;padding:2px 6px;border-radius:6px}
-    main pre{background:#0e1422;padding:14px;border-radius:10px;overflow:auto}
-    /* Footer */
-    footer{max-width:1100px;margin:24px auto 60px;padding:0 16px;color:var(--muted);text-align:center}
-    footer a{color:#bba7ff}
-  </style>
-</head>
-<body>
-
-  <!-- HERO -->
-  <div class="hero">
-    <img src="https://dummyimage.com/1200x280/0a0f1f/89faff&text=Verified+CryptoBro+Hub" alt="Verified CryptoBro Hub — Banner">
-    <h1>🪂 Verified CryptoBro Hub</h1>
-    <p class="subtitle">Trusted links to <b>authentic airdrops</b>, plus the <b>people</b>, <b>tools</b>, and <b>ecosystems</b> every <b>CryptoBro</b> should follow.</p>
-    <div class="pills">
-      <a class="pill" href="#page=README">🏠 Home</a>
-      <a class="pill" href="#page=verified-list">✅ Verified Airdrops</a>
-      <a class="pill" href="#page=monad">🟣 Monad</a>
-      <a class="pill" href="#page=optimism">🔴 Optimism</a>
-      <a class="pill" href="#page=base">🔵 Base</a>
-      <a class="pill" href="#page=ink">⚫ Ink</a>
-    </div>
-    <p><small>Community-maintained. No seed phrases. No private keys. DYOR.</small></p>
-  </div>
-
-  <!-- LAYOUT -->
-  <div class="container">
-    <aside>
-      <div class="side-title">Navigation</div>
-      <div class="side-group">
-        <a class="side-link" data-route="README" href="#page=README">🏠 Overview</a>
-        <a class="side-link" data-route="verified-list" href="#page=verified-list">✅ Verified Airdrops</a>
-      </div>
-
-      <div class="side-title">Ecosystem Guides</div>
-      <div class="side-group">
-        <a class="side-link" data-route="monad" href="#page=monad">🟣 Monad Guide</a>
-        <a class="side-link" data-route="optimism" href="#page=optimism">🔴 Optimism Guide</a>
-        <a class="side-link" data-route="base" href="#page=base">🔵 Base Guide</a>
-        <a class="side-link" data-route="ink" href="#page=ink">⚫ Ink Guide</a>
-      </div>
-
-      <div class="side-title">Follow & Builders</div>
-      <div class="side-group">
-        <a class="side-link" data-route="README#-wallet--portfolio-trackers" href="#page=README&anchor=%F0%9F%93%8A%20Wallet%20%26%20Portfolio%20Trackers">📊 Wallet Trackers</a>
-        <a class="side-link" data-route="README#️-essential-security-tools" href="#page=README&anchor=%F0%9F%9B%A0%EF%B8%8F%20Essential%20Security%20Tools">🛠️ Security Tools</a>
-        <a class="side-link" data-route="README#-airdrop-influencers-x--twitter" href="#page=README&anchor=%F0%9F%91%A5%20Airdrop%20Influencers%20(X%20%2F%20Twitter)">👥 Influencers</a>
-        <a class="side-link" data-route="README#-airdrop-builders-github" href="#page=README&anchor=%F0%9F%92%BB%20Airdrop%20Builders%20(GitHub)">💻 Builders</a>
-      </div>
-    </aside>
-
-    <main id="content">
-      <!-- Markdown content will be injected here -->
-      <p>Loading…</p>
-    </main>
-  </div>
-
-  <footer>
-    <p>
-      Built and   Powered by <a href="https://github.com/benoit80000">benoit80000</a> · 
-      Follow <a href="https://x.com/Funky80310">@Funky80310</a>
-    </p>
-  </footer>
-
-  <script>
-    // -------- SETTINGS (auto-detect username/repo) --------
-    const username = location.hostname.split('.')[0] || 'benoit80000'; // ex: benoit80000.github.io → benoit80000
-    const repo     = `${username}.github.io`; // user site repo
-    const branch   = 'main';
-    const RAW_BASE = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/`;
-
-    // Map "route" → markdown file path at repo root
-    const ROUTES = {
-      'README':        'README.md',        // your long README content
-      'verified-list': 'verified-list.md',
-      'monad':         'monad.md',
-      'optimism':      'optimism.md',
-      'base':          'base.md',
-      'ink':           'ink.md'
-    };
-
-    // -------- HELPERS --------
-    function getHashParams(){
-      const h = location.hash.replace(/^#/, '');
-      const obj = {};
-      h.split('&').forEach(kv=>{
-        if(!kv) return;
-        const [k,v] = kv.split('=');
-        obj[decodeURIComponent(k||'')] = decodeURIComponent(v||'');
-      });
-      return obj;
+      color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility
     }
 
-    function setActive(route){
-      document.querySelectorAll('.side-link').forEach(a=>a.classList.remove('active'));
-      const el = document.querySelector(`.side-link[data-route="${route}"]`);
-      if(el) el.classList.add('active');
-    }
+    /* Top bar (mobile) */
+    .topbar{
+      display:none;position:sticky;top:0;z-index:50;
+      background:linear-gradient(145deg, rgba(11,11,25,
 
-    // Intercept clicks on links inside rendered markdown:
-    // - if they end with ".md" and are relative → load via SPA instead of full navigation
-    function hijackLinks(container){
-      container.querySelectorAll('a[href]').forEach(a=>{
-        const href = a.getAttribute('href');
-        if(!href) return;
-
-        try{
-          const url = new URL(href, location.href);
-          const isSameOrigin = (url.origin === location.origin);
-          const isRelativeMd = /\.md(#.*)?$/.test(href) && !/^https?:\/\//.test(href);
-
-          if(isSameOrigin && /\.md$/.test(url.pathname)){
-            // same-origin .md (rare on Pages) → use SPA
-            a.addEventListener('click', e=>{
-              e.preventDefault();
-              const name = url.pathname.split('/').pop().replace(/\.md$/,'');
-              location.hash = `page=${encodeURIComponent(name)}`;
-            });
-          }
-          else if(isRelativeMd){
-            a.addEventListener('click', e=>{
-              e.preventDefault();
-              const file = href.split('#')[0];
-              const name = file.replace(/^\.\//,'').replace(/\.md$/,'');
-              const anchor = href.includes('#') ? href.split('#').slice(1).join('#') : '';
-              location.hash = `page=${encodeURIComponent(name)}${anchor ? `&anchor=${encodeURIComponent(anchor)}`:''}`;
-            });
-          }
-        }catch(e){}
-      });
-    }
-
-    async function loadMarkdown(file){
-      const url = RAW_BASE + file;
-      const res = await fetch(url, {cache:'no-cache'});
-      if(!res.ok) throw new Error(`Cannot load ${file}: ${res.status}`);
-      return res.text();
-    }
-
-    function scrollToAnchor(anchor){
-      if(!anchor) return;
-      // anchor may be already-encoded; try both
-      const id = decodeURIComponent(anchor);
-      const el = document.getElementById(id) || document.querySelector(`[id="${CSS.escape(anchor)}"]`);
-      if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
-    }
-
-    async function render(){
-      const { page = 'README', anchor='' } = getHashParams();
-      const route = page.replace(/\.md$/,'');
-      const file = ROUTES[route] || ROUTES['README'];
-
-      setActive(route);
-
-      const contentEl = document.getElementById('content');
-      contentEl.innerHTML = `<p>Loading <code>${file}</code>…</p>`;
-
-      try{
-        const md = await loadMarkdown(file);
-        // Configure marked for GitHub-like headings (adds id anchors)
-        marked.setOptions({ headerIds: true, mangle: false });
-        const dirtyHtml = marked.parse(md);
-        const cleanHtml = DOMPurify.sanitize(dirtyHtml);
-        contentEl.innerHTML = cleanHtml;
-
-        // After render: re-wire inner markdown links to act as SPA routes
-        hijackLinks(contentEl);
-
-        // Optional: auto-scroll to anchor if provided
-        if(anchor){ setTimeout(()=>scrollToAnchor(anchor), 50); }
-      }catch(err){
-        contentEl.innerHTML = `
-          <h2>Not Found</h2>
-          <p>Could not load <code>${file}</code>. Ensure it exists at the <b>repo root</b> on branch <code>${branch}</code>.</p>
-          <pre style="background:#0e1422;padding:12px;border-radius:8px">${DOMPurify.sanitize(String(err))}</pre>
-        `;
-      }
-    }
-
-    window.addEventListener('hashchange', render);
-    document.addEventListener('DOMContentLoaded', render);
-  </script>
-</body>
-</html>
 
 
