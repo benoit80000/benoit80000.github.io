@@ -3,7 +3,7 @@
   <img src="https://dummyimage.com/1200x280/0a0f1f/89faff&text=Verified+CryptoBro+Hub" alt="Verified CryptoBro Hub — Banner">
 </p>
 
-<h1 align="center">🪂 Verified CryptoBro Hub</h1>
+<h1 align="center">🪂 CryptoBro Hub</h1>
 <p align="center">
   Trusted links to <b>authentic airdrops</b>, plus the <b>people</b>, <b>tools</b>, and <b>ecosystems</b> every <b>CryptoBro</b> should follow.
 </p>
@@ -48,20 +48,6 @@ Explore verified and safe airdrops from official sources — **no phishing, no d
     <img src="https://img.shields.io/badge/View_the_Full_List-Click_Here-22c55e?style=for-the-badge">
   </a>
 </div>
-
----
-
-## 🌐 Ecosystem Pages
-Elegant, single-page guides for each ecosystem — **official links, active campaigns, partner apps, and eligibility tips**.
-
-<table>
-  <tr>
-    <td><a href="./monad.md">🟣 <b>Monad</b></a><br/><sub>High-performance L1 — early community rewards</sub></td>
-    <td><a href="./optimism.md">🔴 <b>Optimism</b></a><br/><sub>L2 — users, builders & governance incentives</sub></td>
-    <td><a href="./base.md">🔵 <b>Base</b></a><br/><sub>Coinbase L2 — frequent campaign drops</sub></td>
-    <td><a href="./ink.md">⚫ <b>Ink</b></a><br/><sub>dApp-centric — active testnet incentives</sub></td>
-  </tr>
-</table>
 
 ---
 
@@ -118,9 +104,9 @@ Curated accounts with strong signal-to-noise for drops, criteria, and strategies
 | Name | X Handle | Focus |
 |---|---|---|
 | **JiRaYa OG** | [@JiRaYa_OG](https://x.com/JiRaYa_OG) | Web3 researcher, airdrop hunter & alpha provider — founder of JiRaYa Crew |
-| **Mo** | [ (https://x.com/mdmo____/| Idea explorer | Science fiction, innovation & blockchain | At the crossroads of possible futures | #Crypto  — member of JiRaYa Crew |
-| **Rico** | [https://x.com/@Riko45Ls| invest - AD hunter 🪂 Cryptovore 
-| **Mjul23** | [https://x.com/mjul23 | Lost in Web3 — member of JiRaYa Crew |
+| **Mo** | [ https://x.com/mdmo____| Idea explorer | Science fiction, innovation & blockchain | At the crossroads of possible futures | #Crypto  — member of JiRaYa Crew |
+| **Rico** | https://x.com/@Riko45Ls| invest - AD hunter 🪂 Cryptovore 
+| **Mjul23** | https://x.com/mjul23 | Lost in Web3 — member of JiRaYa Crew |
 | Miles Deutscher | https://x.com/milesdeutscher | Strategy, alpha, market structure |
 | CryptoDep | https://x.com/Crypto_Dep | Daily drop threads & updates |
 | DeFi Airdrops | https://x.com/defiairdrops | Ongoing/upcoming drop trackers |
