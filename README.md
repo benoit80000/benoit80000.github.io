@@ -132,7 +132,8 @@ Open-source teams shaping the infra & protocols behind major distributions.
 
 | Org / Crew | GitHub | Why Follow |
 |-------------|---------|-------------|
-| **JiRaYa Crew** | [https://github.com/JiRaYaOG/jiraya-crew](https://github.com/JiRaYaOG/jiraya-crew) | Community of Web3 builders & airdrop researchers — sharing verified projects and open tools |
+| **JiRaYa OG** | [https://github.com/JiRaYaOG/jiraya-crew](https://github.com/JiRaYaOG/jiraya-crew) | Community of Web3 builders & airdrop researchers — sharing verified projects and open tools |
+| **MO** | [https://github.com/MoGlobekiffers | Community of Web3 builders & airdrop researchers — sharing verified projects and open tools |
 | OpenZeppelin | [https://github.com/OpenZeppelin](https://github.com/OpenZeppelin) | Security-first contracts & audits |
 | LayerZero Labs | [https://github.com/LayerZero-Labs](https://github.com/LayerZero-Labs) | Cross-chain messaging / bridging |
 | Monad | [https://github.com/monadlabs](https://github.com/monadlabs) | High-performance L1 research & tooling |
