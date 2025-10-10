@@ -104,15 +104,9 @@ Curated accounts with strong signal-to-noise for drops, criteria, and strategies
 | Name | X Handle | Focus |
 |---|---|---|
 | **JiRaYa OG** | [@JiRaYa_OG](https://x.com/JiRaYa_OG) | Web3 researcher, airdrop hunter & alpha provider — founder of JiRaYa Crew |
-| **Mo** | [ https://x.com/mdmo____| Idea explorer | Science fiction, innovation & blockchain | At the crossroads of possible futures | #Crypto  — member of JiRaYa Crew |
+| **Mo** | [ https://x.com/mdmo____ | Idea explorer | Science fiction, innovation & blockchain | At the crossroads of possible futures | #Crypto  — member of JiRaYa Crew |
 | **Rico** | https://x.com/@Riko45Ls| invest - AD hunter 🪂 Cryptovore 
 | **Mjul23** | https://x.com/mjul23 | Lost in Web3 — member of JiRaYa Crew |
-| Miles Deutscher | https://x.com/milesdeutscher | Strategy, alpha, market structure |
-| CryptoDep | https://x.com/Crypto_Dep | Daily drop threads & updates |
-| DeFi Airdrops | https://x.com/defiairdrops | Ongoing/upcoming drop trackers |
-| LayerZero Labs | https://x.com/LayerZero_Labs | Cross-chain ecosystem signals |
-| Arbitrum | https://x.com/arbitrum | Official L2 comms |
-| zkSync | https://x.com/zksync | zk-scaling ecosystem news |
 
 ---
 
