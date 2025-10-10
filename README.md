@@ -1,5 +1,4 @@
 <!-- HERO -->
-<h1 align="center">🪂 CryptoBro Hub</h1>
 <p align="center">
   Trusted links to <b>authentic airdrops</b>, plus the <b>people</b>, <b>tools</b>, and <b>ecosystems</b> every <b>CryptoBro</b> should follow.
 </p>
