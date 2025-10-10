@@ -1,9 +1,5 @@
 <!-- HERO -->
-<p align="center">
-  <img src="https://dummyimage.com/1200x280/0a0f1f/89faff&text=Verified+CryptoBro+Hub" alt="Verified CryptoBro Hub — Banner">
-</p>
-
-<h1 align="center">🪂 CryptoBro Hub</h1>
+<h3 align="center">🪂 CryptoBro Hub</h3>
 <p align="center">
   Trusted links to <b>authentic airdrops</b>, plus the <b>people</b>, <b>tools</b>, and <b>ecosystems</b> every <b>CryptoBro</b> should follow.
 </p>
