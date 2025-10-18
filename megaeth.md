@@ -42,8 +42,10 @@ Imagine DeFi, gaming, or social apps responding *instantly*, like Web2.
 
 ## 🌐 Learn More
 
-🔗 [Official site](https://megaeth.com)  
-🧵 *“MegaETH = Ethereum, but real-time ⚡️”*
+🔗 **Official site:** [https://megaeth.io](https://megaeth.io)  
+🧵 **X (Twitter):** [@megaeth_labs](https://x.com/megaeth_labs)  
+💬 **Discord:** [![Discord](https://img.shields.io/badge/Join%20Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/megaeth)  
+💰 **Token Sale:** [https://token.megaeth.com/](https://token.megaeth.com/)
 
 ---
 
