@@ -65,6 +65,8 @@
       <a class="pill" href="#page=monad">🟣 Monad</a>
       <a class="pill" href="#page=optimism">🔴 Optimism</a>
       <a class="pill" href="#page=base">🔵 Base</a>
+      <!-- NEW: MegaETH pill before Ink -->
+      <a class="pill" href="#page=megaeth">🟣 MegaETH</a>
       <a class="pill" href="#page=ink">⚫ Ink</a>
     </div>
     <p><small>Community-maintained. No seed phrases. No private keys. DYOR.</small></p>
@@ -84,6 +86,8 @@
         <a class="side-link" data-route="monad" href="#page=monad">🟣 Monad Guide</a>
         <a class="side-link" data-route="optimism" href="#page=optimism">🔴 Optimism Guide</a>
         <a class="side-link" data-route="base" href="#page=base">🔵 Base Guide</a>
+        <!-- NEW: MegaETH item before Ink -->
+        <a class="side-link" data-route="megaeth" href="#page=megaeth">🟣 MegaETH Guide</a>
         <a class="side-link" data-route="ink" href="#page=ink">⚫ Ink Guide</a>
       </div>
 
@@ -123,6 +127,8 @@
       'monad':         'monad.md',
       'optimism':      'optimism.md',
       'base':          'base.md',
+      // NEW: MegaETH route
+      'megaeth':       'megaeth.md',
       'ink':           'ink.md'
     };
 
@@ -154,7 +160,7 @@
         try{
           const url = new URL(href, location.href);
           const isSameOrigin = (url.origin === location.origin);
-          const isRelativeMd = /\.md(#.*)?$/.test(href) && !/^https?:\/\//.test(href);
+        const isRelativeMd = /\.md(#.*)?$/.test(href) && !/^https?:\/\//.test(href);
 
           if(isSameOrigin && /\.md$/.test(url.pathname)){
             // same-origin .md (rare on Pages) → use SPA
@@ -229,4 +235,5 @@
   </script>
 </body>
 </html>
+
 
