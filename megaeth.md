@@ -42,7 +42,7 @@ Imagine DeFi, gaming, or social apps responding *instantly*, like Web2.
 
 ## 🌐 Learn More
 
-🔗 [Official site](https://megaeth.io)  
+🔗 [Official site](https://megaeth.com)  
 🧵 *“MegaETH = Ethereum, but real-time ⚡️”*
 
 ---
