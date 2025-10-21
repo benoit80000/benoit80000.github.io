@@ -1,15 +1,4 @@
-<!--
-Project: DeFi Wallet Inspector — vNext (Front-only)
-Files included in this single document (copy out to real files):
-  - index.html                (main SPA: UI + logic)
-  - cf-worker.js              (Cloudflare Worker proxy for *scan & optional price API)
-  - sw.js                     (Service Worker: cache, offline, stale-while-revalidate)
-Note: Keep ethers v6 UMD. No build step required.
--->
 
-<!-- ============================= -->
-<!-- ========== index.html ======== -->
-<!-- ============================= -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -646,53 +635,3 @@ Note: Keep ethers v6 UMD. No build step required.
 </script>
 </body>
 </html>
-
-
-<!-- =================================== -->
-<!-- ========== cf-worker.js ============ -->
-<!-- =================================== -->
-/**
- * Cloudflare Worker proxy for scan APIs & price endpoints
- * Usage: deploy and set route to your domain; in index.html, toggle "via proxy".
- */
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    if(url.pathname === '/proxy'){
-      const target = url.searchParams.get('url');
-      if(!target) return new Response('Missing url', {status:400});
-      const upstream = new Request(target, { headers: { 'user-agent': request.headers.get('user-agent')||'' } });
-      const resp = await fetch(upstream);
-      // CORS open to caller origin
-      const h = new Headers(resp.headers);
-      h.set('access-control-allow-origin', url.origin);
-      h.set('access-control-allow-credentials','true');
-      return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
-    }
-    return new Response('OK', {status:200});
-  }
-}
-
-
-<!-- ============================== -->
-<!-- ========== sw.js ============= -->
-<!-- ============================== -->
-const CACHE = 'defi-inspector-static-v1';
-self.addEventListener('install', (e)=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html']))); });
-self.addEventListener('activate', (e)=>{ e.waitUntil(self.clients.claim()); });
-self.addEventListener('fetch', (e)=>{
-  const url = new URL(e.request.url);
-  if(url.pathname.startsWith('/proxy')){ // network-first, then stale
-    e.respondWith((async()=>{
-      try{ const res = await fetch(e.request); const c=await caches.open('defi-inspector-v1'); if(res.ok) c.put(e.request,res.clone()); return res; }catch{ const hit = await caches.match(e.request); return hit || new Response('offline', {status:503}); }
-    })());
-    return;
-  }
-  // static: stale-while-revalidate
-  e.respondWith((async()=>{
-    const cache = await caches.open(CACHE);
-    const hit = await cache.match(e.request);
-    const net = fetch(e.request).then(res=>{ try{ if(res.ok) cache.put(e.request,res.clone()); }catch{} return res; });
-    return hit || net;
-  })());
-});
