@@ -68,6 +68,8 @@
       <!-- NEW: MegaETH pill before Ink -->
       <a class="pill" href="#page=megaeth">🟣 MegaETH</a>
       <a class="pill" href="#page=ink">⚫ Ink</a>
+      <!-- ✅ ADDED: DeFi Wallet Inspector -->
+      <a class="pill" href="defi-wallet-inspector.html" target="_blank" rel="noopener">🧮 DeFi Wallet Inspector</a>
     </div>
     <p><small>Community-maintained. No seed phrases. No private keys. DYOR.</small></p>
   </div>
@@ -79,6 +81,8 @@
       <div class="side-group">
         <a class="side-link" data-route="README" href="#page=README">🏠 Overview</a>
         <a class="side-link" data-route="verified-list" href="#page=verified-list">✅ Verified Airdrops</a>
+        <!-- ✅ ADDED: sidebar link to Inspector -->
+        <a class="side-link" href="defi-wallet-inspector.html" target="_blank" rel="noopener">🧮 DeFi Wallet Inspector</a>
       </div>
 
       <div class="side-title">Ecosystem Guides</div>
@@ -160,7 +164,7 @@
         try{
           const url = new URL(href, location.href);
           const isSameOrigin = (url.origin === location.origin);
-        const isRelativeMd = /\.md(#.*)?$/.test(href) && !/^https?:\/\//.test(href);
+          const isRelativeMd = /\.md(#.*)?$/.test(href) && !/^https?:\/\//.test(href);
 
           if(isSameOrigin && /\.md$/.test(url.pathname)){
             // same-origin .md (rare on Pages) → use SPA
@@ -235,5 +239,3 @@
   </script>
 </body>
 </html>
-
-
