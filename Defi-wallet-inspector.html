@@ -200,25 +200,24 @@
   }
 
   function aggregateTokenTransfers(transfers, address){
-    const lower = address.toLowerCase();
+    const lower = (address||'').toLowerCase();
     const map = new Map();
-    for(const t of transfers){
-      const key = t.contractAddress.toLowerCase();
-      const prev = map.get(key) || { contract:key, symbol:t.tokenSymbol, decimals:Number(t.tokenDecimal||18), rawIn:0n, rawOut:0n };
-      const val = BigInt(t.value);
-      if((t.to||'').toLowerCase() === lower) prev.rawIn += val; else if((t.from||'').toLowerCase() === lower) prev.rawOut += val;
-      map.set(key, prev);
+    for(const t of (transfers||[])){
+      const ca = (t && t.contractAddress) ? String(t.contractAddress).toLowerCase() : null;
+      const to = (t && t.to) ? String(t.to).toLowerCase() : '';
+      const from = (t && t.from) ? String(t.from).toLowerCase() : '';
+      const valStr = t && t.value != null ? String(t.value) : null;
+      if(!ca || !valStr) continue; // ignore malformed rows
+      let val = 0n; try{ val = BigInt(valStr); }catch(e){ continue; }
+      const prev = map.get(ca) || { contract: ca, symbol: t && t.tokenSymbol || 'UNK', decimals: Number(t && t.tokenDecimal || 18), rawIn:0n, rawOut:0n };
+      if(to === lower) prev.rawIn += val; else if(from === lower) prev.rawOut += val;
+      map.set(ca, prev);
     }
     const rows = [];
     for(const v of map.values()){
       const net = v.rawIn - v.rawOut;
-      rows.push({
-        token: v.symbol || 'UNK',
-        contract: v.contract,
-        decimals: v.decimals,
-        balance_raw: net.toString(),
-        balance_fmt: (()=>{ try{ return Number(net) / (10**v.decimals); }catch(e){ return NaN; } })(),
-      });
+      let balanceFmt = NaN; try{ balanceFmt = Number(net) / (10 ** (isFinite(v.decimals)? v.decimals : 18)); }catch(e){}
+      rows.push({ token: v.symbol || 'UNK', contract: v.contract, decimals: isFinite(v.decimals)? v.decimals : 18, balance_raw: net.toString(), balance_fmt: balanceFmt });
     }
     return rows.sort((a,b)=> (b.balance_fmt||0)-(a.balance_fmt||0));
   }
@@ -239,22 +238,25 @@
   function renderTxs(txs, chainKey){
     const tbody = $('tblTxs').querySelector('tbody');
     const scan = CHAIN[chainKey].scan;
+    const short = (s)=>{ s = (s||''); return s.length>16 ? `${s.slice(0,8)}…${s.slice(-6)}` : s; };
     tbody.innerHTML = (txs||[]).map(t=>{
-      const link = `${scan}/tx/${t.hash || t.hash || t.txhash || t.hash}`;
-      const from = t.from || '—';
-      const to = t.to || '—';
+      const hash = t.hash || t.txhash || t.transactionHash || '';
+      const link = hash ? `${scan}/tx/${hash}` : '#';
+      const from = t.from || '';
+      const to = t.to || '';
       const value = t.value ? Number(t.value)/1e18 : 0;
       const ts = t.timeStamp ? Number(t.timeStamp) : (t.timeStampSec||0);
       return `<tr>
         <td>${toDate(ts)}</td>
-        <td class="mono"><a href="${link}" target="_blank" rel="noopener">${(t.hash||'').slice(0,10)}…</a></td>
-        <td class="mono">${from.slice(0,8)}…${from.slice(-6)}</td>
-        <td class="mono">${to.slice(0,8)}…${to.slice(-6)}</td>
+        <td class="mono"><a href="${link}" target="_blank" rel="noopener">${short(hash)}</a></td>
+        <td class="mono">${from ? short(from) : '—'}</td>
+        <td class="mono">${to ? short(to) : '—'}</td>
         <td class="mono">${fmt(value,6)}</td>
         <td class="mono">${t.nonce ?? '—'}</td>
         <td class="mono">${t.blockNumber ?? '—'}</td>
       </tr>`;
     }).join('');
+  }).join('');
   }
 
   function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
