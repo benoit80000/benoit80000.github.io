@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeFi Wallet Inspector — HTML Only</title>
+  <meta name="description" content="Inspecteur de wallet crypto: solde natif, tokens ERC-20, transactions récentes — uniquement côté navigateur." />
+  <style>
+    :root { --bg:#0b0c10; --panel:#12141a; --text:#e8e8ea; --muted:#9aa0a6; --primary:#6ee7b7; --accent:#7aa2f7; --danger:#ff6b6b; }
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b0c10,#0f1117);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    a{color:var(--accent)} .container{max-width:1100px;margin:40px auto;padding:0 20px}
+    .card{background:var(--panel);border:1px solid #20232b;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
+    .grid{display:grid;gap:16px}
+    .grid.cols-2{grid-template-columns:1fr 1fr}
+    .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+    @media (max-width:900px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr}}
+    label{display:block;margin:6px 0 6px 2px;color:var(--muted);font-size:13px}
+    input,select{width:100%;background:#11131a;border:1px solid #232633;color:var(--text);padding:12px 14px;border-radius:12px;outline:none}
+    input::placeholder{color:#6b7280}
+    button{cursor:pointer;border:none;border-radius:12px;padding:12px 16px;background:var(--accent);color:#0b0c10;font-weight:700}
+    button.secondary{background:#2a2f3a;color:var(--text)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:6px;background:#1a1e28;border:1px solid #2c3140;color:#d1d5db;border-radius:999px;padding:6px 10px;font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px dashed #2a2f3a;vertical-align:middle}
+    th{text-align:left;color:#aab1bb;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+    .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .kpi{display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid #1f2330;border-radius:12px;background:#0f121a}
+    .kpi .v{font-size:22px;font-weight:800}
+    .footer{opacity:.7;font-size:12px;margin-top:18px}
+    .warn{color:var(--danger)}
+    .spinner{width:18px;height:18px;border:2px solid #94a3b8;border-top-color:transparent;border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .code{background:#0f1216;border:1px solid #1f2430;border-radius:10px;padding:10px;font-size:12px;overflow:auto}
+  </style>
+  <!-- Ethers v6 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="grid cols-2" style="align-items:center">
+      <div>
+        <h1 style="margin:0 0 6px 0;font-size:28px">DeFi Wallet Inspector</h1>
+        <p class="muted" style="margin:0">Saisis une adresse et récupère les éléments depuis les exploreurs (aucun backend).</p>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button id="btnExportJSON" class="secondary" disabled>Exporter JSON</button>
+        <button id="btnExportCSV" class="secondary" disabled>Exporter CSV</button>
+      </div>
+    </header>
+
+    <section class="card" style="margin-top:16px">
+      <div class="grid cols-3">
+        <div>
+          <label>Adresse du wallet (EVM)</label>
+          <input id="inpAddress" placeholder="0x..." spellcheck="false" class="mono" />
+        </div>
+        <div>
+          <label>Chaîne</label>
+          <select id="selChain">
+            <option value="eth">Ethereum</option>
+            <option value="polygon">Polygon</option>
+            <option value="bsc">BSC</option>
+            <option value="arbitrum">Arbitrum One</option>
+            <option value="optimism">Optimism</option>
+          </select>
+        </div>
+        <div>
+          <label>Clé API *scan (optionnelle)</label>
+          <input id="inpApiKey" placeholder="Etherscan/Polygonscan/BscScan API key" />
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>RPC (optionnel — lecture du solde natif)</label>
+          <input id="inpRpc" placeholder="https://mainnet.infura.io/v3/… (ou laisser vide)" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <div class="row">
+            <button id="btnInspect"><span id="btnText">Inspecter</span> <span id="btnSpin" class="spinner" style="display:none"></span></button>
+            <span class="pill">Lecture seule</span>
+            <span class="pill">100% navigateur</span>
+          </div>
+        </div>
+      </div>
+      <p class="footer">Astuce : pour plus de résultats, fournis une clé API de l'explorateur correspondant. Certaines API peuvent appliquer des limites de CORS ou de rate‑limit.</p>
+    </section>
+
+    <section class="grid cols-3" style="margin-top:16px">
+      <div class="kpi">
+        <div class="muted">Chaîne</div>
+        <div class="v" id="kpiChain">—</div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Solde natif</div>
+        <div class="v" id="kpiNative">—</div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Transactions (récupérées)</div>
+        <div class="v" id="kpiTx">—</div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Tokens (heuristique à partir des transferts)</h3>
+      <div class="muted" style="margin-bottom:8px">Somme des entrées – sorties sur ERC‑20 vus par l'explorateur (peut diverger du solde réel, surtout avec contrats proxy/vesting).</div>
+      <div style="overflow:auto">
+        <table id="tblTokens">
+          <thead>
+            <tr><th>Token</th><th class="mono">Contrat</th><th class="mono">Décimales</th><th class="mono">Solde (brut)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Transactions récentes</h3>
+      <div style="overflow:auto">
+        <table id="tblTxs">
+          <thead>
+            <tr><th>Date</th><th>Hash</th><th>De</th><th>À</th><th>Valeur</th><th>Nonce</th><th>Bloc</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Journal brut (JSON)</h3>
+      <pre id="jsonOut" class="code">—</pre>
+      <div class="footer">Ce JSON inclut: balance natif, transferts ERC‑20 agrégés, transactions (max 100), et métadonnées de la chaîne.</div>
+    </section>
+
+    <p class="footer">⚠️ Ceci n'est pas un conseil financier. Prototype éducatif. Les API publiques peuvent limiter ou bloquer des requêtes depuis le navigateur (CORS/rate‑limit). Fournir sa propre clé API et/ou passer via un proxy serveur peut être nécessaire pour un usage intensif.</p>
+  </div>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const state = { last: null };
+
+  const CHAIN = {
+    eth: { name:'Ethereum', symbol:'ETH', explorer:'https://api.etherscan.io/api', unit:18, scan:'https://etherscan.io' },
+    polygon: { name:'Polygon', symbol:'MATIC', explorer:'https://api.polygonscan.com/api', unit:18, scan:'https://polygonscan.com' },
+    bsc: { name:'BSC', symbol:'BNB', explorer:'https://api.bscscan.com/api', unit:18, scan:'https://bscscan.com' },
+    arbitrum: { name:'Arbitrum One', symbol:'ETH', explorer:'https://api.arbiscan.io/api', unit:18, scan:'https://arbiscan.io' },
+    optimism: { name:'Optimism', symbol:'ETH', explorer:'https://api-optimistic.etherscan.io/api', unit:18, scan:'https://optimistic.etherscan.io' },
+  };
+
+  function fmt(n, digits=6){
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    const a = Math.abs(n);
+    if(a >= 1) return n.toLocaleString(undefined,{maximumFractionDigits:digits});
+    if(a === 0) return '0';
+    return n.toPrecision(3);
+  }
+  function toDate(secs){ try{ return new Date(secs*1000).toLocaleString(); }catch(e){ return '—'; } }
+
+  async function getNativeBalance(addr, chainKey, rpcUrl){
+    try{
+      const provider = rpcUrl ? new ethers.BrowserProvider(new ethers.JsonRpcProvider(rpcUrl)) : new ethers.BrowserProvider(window.ethereum || new ethers.JsonRpcProvider(getDefaultRPC(chainKey)));
+      // ethers v6: if provider is BrowserProvider from jsonrpc, need signer? Instead use JsonRpcProvider directly.
+    }catch(e){ /* ignore */ }
+    try{
+      const provider = new ethers.JsonRpcProvider(rpcUrl || getDefaultRPC(chainKey));
+      const bal = await provider.getBalance(addr);
+      return Number(ethers.formatEther(bal));
+    }catch(e){ return null; }
+  }
+
+  function getDefaultRPC(chainKey){
+    switch(chainKey){
+      case 'eth': return 'https://cloudflare-eth.com';
+      case 'polygon': return 'https://polygon-rpc.com';
+      case 'bsc': return 'https://bsc-dataseed.binance.org/';
+      case 'arbitrum': return 'https://arb1.arbitrum.io/rpc';
+      case 'optimism': return 'https://mainnet.optimism.io';
+      default: return 'https://cloudflare-eth.com';
+    }
+  }
+  }
+
+  async function fetchExplorer(module, action, chainKey, params, apiKey){
+    const base = CHAIN[chainKey].explorer;
+    const url = new URL(base);
+    url.searchParams.set('module', module);
+    url.searchParams.set('action', action);
+    Object.entries(params||{}).forEach(([k,v])=> url.searchParams.set(k, v));
+    if(apiKey) url.searchParams.set('apikey', apiKey);
+    const res = await fetch(url.toString());
+    if(!res.ok) throw new Error('Explorer HTTP '+res.status);
+    const json = await res.json();
+    if(json.status === '0' && json.message && json.result) {
+      // Etherscan style errors
+      console.warn('Explorer:', json.message, json.result);
+    }
+    return json.result || [];
+  }
+
+  function aggregateTokenTransfers(transfers, address){
+    const lower = address.toLowerCase();
+    const map = new Map();
+    for(const t of transfers){
+      const key = t.contractAddress.toLowerCase();
+      const prev = map.get(key) || { contract:key, symbol:t.tokenSymbol, decimals:Number(t.tokenDecimal||18), rawIn:0n, rawOut:0n };
+      const val = BigInt(t.value);
+      if((t.to||'').toLowerCase() === lower) prev.rawIn += val; else if((t.from||'').toLowerCase() === lower) prev.rawOut += val;
+      map.set(key, prev);
+    }
+    const rows = [];
+    for(const v of map.values()){
+      const net = v.rawIn - v.rawOut;
+      rows.push({
+        token: v.symbol || 'UNK',
+        contract: v.contract,
+        decimals: v.decimals,
+        balance_raw: net.toString(),
+        balance_fmt: (()=>{ try{ return Number(net) / (10**v.decimals); }catch(e){ return NaN; } })(),
+      });
+    }
+    return rows.sort((a,b)=> (b.balance_fmt||0)-(a.balance_fmt||0));
+  }
+
+  function renderTokens(rows){
+    const tbody = $('tblTokens').querySelector('tbody');
+    tbody.innerHTML = rows.map(r=>{
+      const bal = isFinite(r.balance_fmt) ? fmt(r.balance_fmt, 6) : r.balance_raw;
+      return `<tr>
+        <td><strong>${escapeHtml(r.token)}</strong></td>
+        <td class="mono"><a href="#" data-contract="${r.contract}">${r.contract.slice(0,8)}…${r.contract.slice(-6)}</a></td>
+        <td class="mono">${r.decimals}</td>
+        <td class="mono">${bal}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderTxs(txs, chainKey){
+    const tbody = $('tblTxs').querySelector('tbody');
+    const scan = CHAIN[chainKey].scan;
+    tbody.innerHTML = (txs||[]).map(t=>{
+      const link = `${scan}/tx/${t.hash || t.hash || t.txhash || t.hash}`;
+      const from = t.from || '—';
+      const to = t.to || '—';
+      const value = t.value ? Number(t.value)/1e18 : 0;
+      const ts = t.timeStamp ? Number(t.timeStamp) : (t.timeStampSec||0);
+      return `<tr>
+        <td>${toDate(ts)}</td>
+        <td class="mono"><a href="${link}" target="_blank" rel="noopener">${(t.hash||'').slice(0,10)}…</a></td>
+        <td class="mono">${from.slice(0,8)}…${from.slice(-6)}</td>
+        <td class="mono">${to.slice(0,8)}…${to.slice(-6)}</td>
+        <td class="mono">${fmt(value,6)}</td>
+        <td class="mono">${t.nonce ?? '—'}</td>
+        <td class="mono">${t.blockNumber ?? '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  function enableExports(data){
+    const btnJ = $('btnExportJSON');
+    const btnC = $('btnExportCSV');
+    btnJ.disabled = btnC.disabled = false;
+    btnJ.onclick = ()=> downloadBlob(JSON.stringify(data,null,2), 'wallet_report.json', 'application/json');
+    btnC.onclick = ()=> downloadBlob(toCSV(data), 'wallet_tokens.csv', 'text/csv');
+  }
+
+  function downloadBlob(content, fileName, contentType){
+    const blob = new Blob([content], {type: contentType});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    setTimeout(()=> URL.revokeObjectURL(url), 2500);
+  }
+
+  function toCSV(data){
+    const rows = data.tokens || [];
+    const head = ['token','contract','decimals','balance_raw','balance_fmt'];
+    const csv = [head.join(',')].concat(rows.map(r=> head.map(k=> JSON.stringify(r[k]??'')).join(',')));
+    return csv.join('\n');
+  }
+
+  async function onInspect(){
+    const addr = $('inpAddress').value.trim();
+    const chainKey = $('selChain').value;
+    const apiKey = $('inpApiKey').value.trim();
+    const rpc = $('inpRpc').value.trim();
+
+    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)) { alert('Adresse EVM invalide.'); return; }
+
+    $('btnInspect').disabled = true; $('btnSpin').style.display='inline-block'; $('btnText').textContent = 'Chargement…';
+
+    try{
+      const chain = CHAIN[chainKey];
+
+      // 1) Solde natif via RPC
+      const native = await getNativeBalance(addr, chainKey, rpc);
+
+      // 2) Transactions récentes via *scan (desc, max 100)
+      const txs = await fetchExplorer('account','txlist', chainKey, { address: addr, startblock:0, endblock:99999999, page:1, offset:100, sort:'desc' }, apiKey).catch(e=>{ console.warn(e); return []; });
+
+      // 3) Transferts ERC20 pour heuristique de solde
+      const transfers = await fetchExplorer('account','tokentx', chainKey, { address: addr, page:1, offset:100 }, apiKey).catch(e=>{ console.warn(e); return []; });
+      const tokens = aggregateTokenTransfers(transfers, addr);
+
+      const report = { chain: chain.name, chain_key: chainKey, address: addr, native_balance: native, native_symbol: chain.symbol, tokens, txs: txs.slice(0,100), generated_at: new Date().toISOString() };
+
+      // Render KPIs
+      $('kpiChain').textContent = chain.name;
+      $('kpiNative').textContent = native!=null ? `${fmt(native,6)} ${chain.symbol}` : '—';
+      $('kpiTx').textContent = txs.length;
+
+      // Render tables
+      renderTokens(tokens);
+      renderTxs(txs, chainKey);
+
+      // Détection des positions LP et adresses de retrait (Uniswap V2-like)
+await (window.detectLPPositions ? detectLPPositions(report, rpc) : Promise.resolve());
+
+// JSON
+$('jsonOut').textContent = JSON.stringify(report, null, 2);
+
+      // enable export
+      enableExports(report);
+      state.last = report;
+    }catch(e){
+      console.error(e);
+      alert('Erreur: '+ (e.message||e));
+    }finally{
+      $('btnInspect').disabled = false; $('btnSpin').style.display='none'; $('btnText').textContent = 'Inspecter';
+    }
+  }
+
+  $('btnInspect').addEventListener('click', onInspect);
+})();
+</script>
+<!-- START: LP detection module injected -->
+<script>
+(function(){
+  const PAIR_ABI = [
+    "function token0() view returns (address)",
+    "function token1() view returns (address)",
+    "function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
+    "function totalSupply() view returns (uint256)",
+    "function balanceOf(address owner) view returns (uint256)",
+    "function decimals() view returns (uint8)"
+  ];
+
+  // Petit annuaire de farms connus (MasterChef / staking) par chaîne
+  const KNOWN_FARMS = {
+    eth: {
+      // exemples
+      // "0xC2EdBa...": "Sushi MasterChef (ETH)"
+    },
+    polygon: {
+      // "0x0769fd68dFb93167989C6f7254cd0D766Fb2841F": "Sushi MasterChef V2 (Polygon)"
+    },
+    bsc: {
+      "0x73feaa1eE314F8c655E354234017bE2193C9E24E": "PancakeSwap MasterChef V1",
+      "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652": "PancakeSwap MasterChef V2"
+    },
+    arbitrum: {
+      // "0x5fe5cC0122403f06eBAF8f647E1eBEcEbA5f3e9d": "Sushi MiniChef (Arbitrum)"
+    },
+    optimism: {
+      // ajouter des adresses si besoin
+    }
+  };
+  function labelKnownFarm(chainKey, addr){
+    const m = KNOWN_FARMS[chainKey] || {}; const name = m[(addr||'').toLowerCase()] || m[addr] || null; return name || null;
+  }
+
+  async function isPairContract(provider, addr){
+    try{ const c = new ethers.Contract(addr, ["function token0() view returns (address)"], provider); await c.token0(); return true; }catch(e){ return false; }
+  }
+  async function inspectPair(provider, pairAddress, wallet){
+    const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
+    try{
+      const [token0, token1, reserves, totalSupply, balRaw] = await Promise.all([ pair.token0(), pair.token1(), pair.getReserves(), pair.totalSupply(), pair.balanceOf(wallet) ]);
+      const decimals0 = await tryDecimals(provider, token0);
+      const decimals1 = await tryDecimals(provider, token1);
+      const reserve0 = BigInt(reserves.reserve0.toString());
+      const reserve1 = BigInt(reserves.reserve1.toString());
+      const total = BigInt(totalSupply.toString());
+      const balance = BigInt(balRaw.toString());
+      const amount0 = total === 0n ? 0n : (balance * reserve0) / total;
+      const amount1 = total === 0n ? 0n : (balance * reserve1) / total;
+      return { pair: pairAddress, token0, token1, decimals0, decimals1, reserve0: reserve0.toString(), reserve1: reserve1.toString(), totalSupply: total.toString(), balanceLP: balance.toString(), underlying0: amount0.toString(), underlying1: amount1.toString() };
+    }catch(err){ return null; }
+  }
+  async function tryDecimals(provider, token){ try{ const c = new ethers.Contract(token, ["function decimals() view returns (uint8)"], provider); return Number(await c.decimals()); }catch(e){ return 18; } }
+  async function detectSentLPToContracts(txs, lpContracts, provider, walletLower){
+    const candidates = new Map();
+    for(const t of txs){
+      const k = (t.contractAddress||'').toLowerCase(); if(!k || !lpContracts.has(k)) continue;
+      if((t.from||'').toLowerCase() === walletLower){
+        const to = (t.to||'').toLowerCase();
+        try{ const code = await provider.getCode(to); if(code && code !== '0x'){ const e = candidates.get(to) || {count:0,lastTs:0}; e.count++; e.lastTs = Math.max(e.lastTs, Number(t.timeStamp||0)); candidates.set(to, e); } }catch(e){}
+      }
+    }
+    return candidates;
+  }
+  function bigIntToFloatStr(bigStr, decimals=18){ try{ const v = BigInt(bigStr); if(v===0n) return '0'; const a=v<0n?-v:v; const s=a.toString().padStart(decimals+1,'0'); const intPart=s.slice(0,-decimals)||'0'; const frac=(s.slice(-decimals).replace(/0+$/,'')||'0'); const out=`${intPart}.${frac}`; return out.length>18?out.slice(0,18):out; }catch(e){ return bigStr; } }
+  function renderLPResults(rows){
+    let el = document.getElementById('lpResultsCard');
+    if(!el){ el = document.createElement('section'); el.id='lpResultsCard'; el.className='card'; el.style.marginTop='16px'; el.innerHTML = '<h3 style="margin:0 0 10px">Positions LP détectées</h3><div style="overflow:auto"><table id="tblLPs"><thead><tr><th>Pair (contrat)</th><th>Token0</th><th>Token1</th><th>LP détenue</th><th>Sous-jacent token0</th><th>Sous-jacent token1</th><th>Retirer depuis</th></tr></thead><tbody></tbody></table></div>'; const anchor = document.getElementById('jsonOut').parentElement; document.querySelector('.container').insertBefore(el, anchor); }
+    const tbody = document.querySelector('#tblLPs tbody');
+    const chainKey = (window.state && window.state.last && window.state.last.chain_key) || (document.getElementById('selChain')?.value || 'eth');
+    tbody.innerHTML = rows.map(r=>{
+      const token0 = r.token0.slice(0,8)+'…'+r.token0.slice(-6);
+      const token1 = r.token1.slice(0,8)+'…'+r.token1.slice(-6);
+      const pair = r.pair;
+      const lpFmt = bigIntToFloatStr(r.balanceLP, r.decimalsLP ?? 18);
+      const u0 = bigIntToFloatStr(r.underlying0, r.decimals0 || 18);
+      const u1 = bigIntToFloatStr(r.underlying1, r.decimals1 || 18);
+      const withdrawAddr = (r.withdrawAddress || pair).toLowerCase();
+      const farmName = labelKnownFarm(chainKey, withdrawAddr);
+      const label = farmName ? farmName : withdrawAddr.slice(0,8)+'…'+withdrawAddr.slice(-6);
+      return `<tr><td class="mono"><a href="#" data-contract="${pair}">${pair.slice(0,8)}…</a></td><td class="mono">${token0}</td><td class="mono">${token1}</td><td class="mono">${lpFmt}</td><td class="mono">${u0}</td><td class="mono">${u1}</td><td class="mono">${label}</td></tr>`;
+    }).join('');
+  }
+  window.detectLPPositions = async function(report, rpcUrl){
+    const chain = (report.chain_key || 'eth');
+    const provider = new ethers.JsonRpcProvider(rpcUrl || (window.getDefaultRPC ? getDefaultRPC(chain) : undefined));
+    const wallet = report.address; const walletLower = wallet.toLowerCase();
+    const tokenContracts = (report.tokens||[]).map(t=> (t.contract||'').toLowerCase()).filter(Boolean);
+    const tokenSet = new Set(tokenContracts);
+    const txs = report.txs || [];
+    const lpFound = []; const lpSet = new Set();
+    for(const c of tokenSet){ try{ if(await isPairContract(provider, c)){ const info = await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ info.decimalsLP=18; lpFound.push(info); lpSet.add(c); } } }catch(e){} }
+    for(const t of txs){ const c=(t.contractAddress||'').toLowerCase(); if(!c || lpSet.has(c)) continue; try{ if(await isPairContract(provider, c)){ const info=await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ lpFound.push(info); lpSet.add(c); } } }catch(e){} }
+    const sentToContracts = await detectSentLPToContracts(txs, lpSet, provider, walletLower);
+    const rows = lpFound.map(l=>{ const pair=l.pair.toLowerCase(); const withdrawAddress = (BigInt(l.balanceLP||'0')>0n)? pair : null; return Object.assign({}, l, { withdrawAddress }); });
+    for(const [contractAddr, info] of sentToContracts.entries()){
+      rows.forEach(r=>{ const found = (txs||[]).find(t=> (t.contractAddress||'').toLowerCase()===r.pair.toLowerCase() && (t.to||'').toLowerCase()===contractAddr.toLowerCase()); if(found){ if(BigInt(r.balanceLP||'0')===0n){ r.withdrawAddress = contractAddr; r.staked = true; r.stakedInfo = info; } else { r.possibleStaking = r.possibleStaking || []; r.possibleStaking.push({ contract: contractAddr, info }); } } });
+    }
+    renderLPResults(rows);
+    return rows;
+  };
+})();
+</script>
+<!-- END: LP detection module injected -->
+</body>
+</html>
