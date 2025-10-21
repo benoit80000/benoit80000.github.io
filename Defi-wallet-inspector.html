@@ -1,14 +1,31 @@
+<!--
+Project: DeFi Wallet Inspector — vNext (Front-only)
+Files included in this single document (copy out to real files):
+  - index.html                (main SPA: UI + logic)
+  - cf-worker.js              (Cloudflare Worker proxy for *scan & optional price API)
+  - sw.js                     (Service Worker: cache, offline, stale-while-revalidate)
+Note: Keep ethers v6 UMD. No build step required.
+-->
+
+<!-- ============================= -->
+<!-- ========== index.html ======== -->
+<!-- ============================= -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DeFi Wallet Inspector — HTML Only</title>
-  <meta name="description" content="Inspecteur de wallet crypto: solde natif, tokens ERC-20, transactions récentes — uniquement côté navigateur." />
+  <title>DeFi Wallet Inspector — vNext</title>
+  <meta name="description" content="Inspecteur de wallet: soldes on-chain via Multicall3, LP v2/v3, NFTs, allowances, prix, ENS, tri/filtre — 100% navigateur." />
+  <link rel="manifest" href="data:application/manifest+json,{\"name\":\"DeFi Wallet Inspector\",\"short_name\":\"DeFiInspector\",\"start_url\":\"./\",\"display\":\"standalone\",\"background_color\":\"#0b0c10\",\"theme_color\":\"#0b0c10\"}">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https:; object-src 'none'">
   <style>
-    :root { --bg:#0b0c10; --panel:#12141a; --text:#e8e8ea; --muted:#9aa0a6; --primary:#6ee7b7; --accent:#7aa2f7; --danger:#ff6b6b; }
+    :root { --bg:#0b0c10; --panel:#12141a; --text:#e8e8ea; --muted:#9aa0a6; --accent:#7aa2f7; --danger:#ff6b6b; --ok:#6ee7b7; }
     *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b0c10,#0f1117);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    a{color:var(--accent)} .container{max-width:1100px;margin:40px auto;padding:0 20px}
+    a{color:var(--accent)} .container{max-width:1200px;margin:32px auto;padding:0 16px}
+    .tabs{display:flex;gap:8px;margin-bottom:12px}
+    .tab{padding:8px 12px;border-radius:10px;background:#1a1e28;border:1px solid #2c3140;cursor:pointer}
+    .tab.active{background:#2a2f3a}
     .card{background:var(--panel);border:1px solid #20232b;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
     .grid{display:grid;gap:16px}
     .grid.cols-2{grid-template-columns:1fr 1fr}
@@ -17,31 +34,31 @@
     label{display:block;margin:6px 0 6px 2px;color:var(--muted);font-size:13px}
     input,select{width:100%;background:#11131a;border:1px solid #232633;color:var(--text);padding:12px 14px;border-radius:12px;outline:none}
     input::placeholder{color:#6b7280}
-    button{cursor:pointer;border:none;border-radius:12px;padding:12px 16px;background:var(--accent);color:#0b0c10;font-weight:700}
+    button{cursor:pointer;border:none;border-radius:12px;padding:10px 14px;background:var(--accent);color:#0b0c10;font-weight:700}
     button.secondary{background:#2a2f3a;color:var(--text)}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .pill{display:inline-flex;align-items:center;gap:6px;background:#1a1e28;border:1px solid #2c3140;color:#d1d5db;border-radius:999px;padding:6px 10px;font-size:12px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:10px;border-bottom:1px dashed #2a2f3a;vertical-align:middle}
-    th{text-align:left;color:#aab1bb;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+    th{text-align:left;color:#aab1bb;font-size:12px;text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
     .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
     .kpi{display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid #1f2330;border-radius:12px;background:#0f121a}
     .kpi .v{font-size:22px;font-weight:800}
     .footer{opacity:.7;font-size:12px;margin-top:18px}
-    .warn{color:var(--danger)}
+    .warn{color:var(--danger)} .ok{color:var(--ok)}
     .spinner{width:18px;height:18px;border:2px solid #94a3b8;border-top-color:transparent;border-radius:50%;animation:spin .9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
     .code{background:#0f1216;border:1px solid #1f2430;border-radius:10px;padding:10px;font-size:12px;overflow:auto}
+    .hidden{display:none}
   </style>
-  <!-- Ethers v6 CDN (UMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" integrity="sha256-YH1bV0f8Yt8CbdQp7MwcIuKn91Qqg3o2VnR8i0O5Ngs=" crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="container">
     <header class="grid cols-2" style="align-items:center">
       <div>
-        <h1 style="margin:0 0 6px 0;font-size:28px">DeFi Wallet Inspector</h1>
-        <p class="muted" style="margin:0">Saisis une adresse et récupère les éléments depuis les exploreurs (aucun backend). <em>Heure affichée : locale du navigateur.</em></p>
+        <h1 style="margin:0 0 6px 0;font-size:28px">DeFi Wallet Inspector — vNext</h1>
+        <p class="muted" style="margin:0">On-chain balances via Multicall3, ENS, prices, LP v2/v3, NFTs, internal TX, allowances. <em>Heure affichée : locale du navigateur.</em></p>
       </div>
       <div class="row" style="justify-content:flex-end">
         <button id="btnExportJSON" class="secondary" disabled>Exporter JSON</button>
@@ -53,7 +70,7 @@
       <div class="grid cols-3">
         <div>
           <label>Adresse du wallet (EVM)</label>
-          <input id="inpAddress" placeholder="0x742d35Cc6634C0532925a3b844Bc454e4438f44e (exemple)" spellcheck="false" class="mono" />
+          <input id="inpAddress" placeholder="0x742d35C... ou vitalik.eth" spellcheck="false" class="mono" />
         </div>
         <div>
           <label>Chaîne</label>
@@ -63,6 +80,8 @@
             <option value="bsc">BSC</option>
             <option value="arbitrum">Arbitrum One</option>
             <option value="optimism">Optimism</option>
+            <option value="base">Base</option>
+            <option value="avalanche">Avalanche C-Chain</option>
           </select>
         </div>
         <div>
@@ -82,472 +101,598 @@
             <button id="btnInspect"><span id="btnText">Inspecter</span> <span id="btnSpin" class="spinner" style="display:none"></span></button>
             <span class="pill">Lecture seule</span>
             <span class="pill">100% navigateur</span>
+            <label class="row" style="gap:6px"><input type="checkbox" id="togProxy"> via proxy (Cloudflare Worker)</label>
           </div>
         </div>
       </div>
-      <p class="footer">Astuce : pour plus de résultats, fournis une clé API de l'explorateur correspondant. Certaines API peuvent appliquer des limites de CORS ou de rate‑limit.</p>
+      <p class="footer">Si *scan retourne un rate-limit/CORS, active « via proxy ». Stockage : session (pas de clé en dur).</p>
     </section>
 
     <section class="grid cols-3" style="margin-top:16px">
-      <div class="kpi">
-        <div class="muted">Chaîne</div>
-        <div class="v" id="kpiChain">—</div>
-      </div>
-      <div class="kpi">
-        <div class="muted">Solde natif</div>
-        <div class="v" id="kpiNative">—</div>
-      </div>
-      <div class="kpi">
-        <div class="muted">Transactions (récupérées)</div>
-        <div class="v" id="kpiTx">—</div>
-      </div>
+      <div class="kpi"><div class="muted">Chaîne</div><div class="v" id="kpiChain">—</div></div>
+      <div class="kpi"><div class="muted">ENS / Adresse</div><div class="v mono" id="kpiEns">—</div></div>
+      <div class="kpi"><div class="muted">Solde natif</div><div class="v" id="kpiNative">—</div></div>
     </section>
 
-    <section class="card" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Tokens (heuristique à partir des transferts)</h3>
-      <div class="muted" style="margin-bottom:8px">Somme des entrées – sorties sur ERC‑20 vus par l'explorateur (peut diverger du solde réel, surtout avec contrats proxy/vesting).</div>
+    <div class="tabs">
+      <div class="tab active" data-tab="tokens">Tokens</div>
+      <div class="tab" data-tab="tokens-heuristic">Heuristique (transferts)</div>
+      <div class="tab" data-tab="tx">Transactions</div>
+      <div class="tab" data-tab="internals">Internes</div>
+      <div class="tab" data-tab="lp">LP v2/v3</div>
+      <div class="tab" data-tab="nfts">NFTs</div>
+      <div class="tab" data-tab="approvals">Allowances</div>
+      <div class="tab" data-tab="console">Console</div>
+    </div>
+
+    <section class="card" data-view="tokens">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">Tokens (solde on-chain via Multicall3)</h3>
+        <div class="row">
+          <input id="fltToken" placeholder="Filtrer par symbole/contrat" style="width:240px"/>
+        </div>
+      </div>
+      <div class="muted" style="margin-bottom:8px">Les prix sont fournis par DeFiLlama si disponibles.</div>
       <div style="overflow:auto">
         <table id="tblTokens">
           <thead>
-            <tr><th>Token</th><th class="mono">Contrat</th><th class="mono">Décimales</th><th class="mono">Solde (brut)</th></tr>
+            <tr>
+              <th data-k="symbol">Token</th>
+              <th data-k="contract" class="mono">Contrat</th>
+              <th data-k="decimals">Décimales</th>
+              <th data-k="balance_fmt">Solde</th>
+              <th data-k="price_usd">Prix (USD)</th>
+              <th data-k="value_usd">Valeur (USD)</th>
+            </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <section class="card" style="margin-top:16px">
+    <section class="card hidden" data-view="tokens-heuristic">
+      <h3 style="margin:0 0 10px">Tokens (heuristique transferts)</h3>
+      <div style="overflow:auto">
+        <table id="tblTokensHeu">
+          <thead>
+            <tr><th>Token</th><th class="mono">Contrat</th><th>Décimales</th><th class="mono">Net (transferts)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" data-view="tx">
       <h3 style="margin:0 0 10px">Transactions récentes</h3>
       <div style="overflow:auto">
         <table id="tblTxs">
           <thead>
-            <tr><th>Date</th><th>Hash</th><th>De</th><th>À</th><th>Valeur</th><th>Nonce</th><th>Bloc</th></tr>
+            <tr>
+              <th data-k="timeStamp">Date</th>
+              <th>Hash</th>
+              <th>De</th>
+              <th>À</th>
+              <th id="thNative">Valeur</th>
+              <th>Nonce</th>
+              <th>Bloc</th>
+              <th>Tag</th>
+            </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
+    <section class="card hidden" data-view="internals">
+      <h3 style="margin:0 0 10px">Transactions internes</h3>
+      <div style="overflow:auto">
+        <table id="tblInternals">
+          <thead>
+            <tr><th>Date</th><th>Hash</th><th>De</th><th>À</th><th>Valeur</th><th>Type</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" data-view="lp">
+      <h3 style="margin:0 0 10px">Positions LP détectées (v2 + v3)</h3>
+      <div style="overflow:auto">
+        <table id="tblLP">
+          <thead>
+            <tr><th>Type</th><th>Contrat / ID</th><th>Détails</th><th>Sous-jacent</th><th>Retrait depuis</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" data-view="nfts">
+      <h3 style="margin:0 0 10px">NFTs (721 / 1155)</h3>
+      <div style="overflow:auto">
+        <table id="tblNFTs">
+          <thead>
+            <tr><th>Collection</th><th class="mono">Contrat</th><th>Token ID / Quantité</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" data-view="approvals">
+      <h3 style="margin:0 0 10px">Allowances (approvals)</h3>
+      <div class="muted" style="margin-bottom:8px">Alerte <span class="warn">infinite approval</span> si allowance ≥ 2^255.</div>
+      <div style="overflow:auto">
+        <table id="tblApprovals">
+          <thead>
+            <tr><th>Token</th><th class="mono">Contrat</th><th>Spender</th><th>Label</th><th>Allowance</th><th>Alerte</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" data-view="console">
+      <h3 style="margin:0 0 10px">Console</h3>
+      <pre id="debugOut" class="code" style="max-height:260px">Prête.</pre>
+    </section>
+
     <section class="card" style="margin-top:16px">
       <h3 style="margin:0 0 10px">Journal brut (JSON)</h3>
-      <pre id="jsonOut" class="code">—</pre>
-      <div class="footer">Ce JSON inclut: balance natif, transferts ERC‑20 agrégés, transactions (max 100), et métadonnées de la chaîne.</div>
+      <pre id="jsonOut" class="code" style="max-height:240px">—</pre>
     </section>
 
-    <section class="card" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Console</h3>
-      <pre id="debugOut" class="code" style="max-height:220px">Prête.</pre>
-      <div class="footer">Si le bouton ne fait rien, regarde ici les messages d'erreur.</div>
-    </section>
-
-    <section class="card" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Tests</h3>
-      <div class="row">
-        <button id="btnRunTests" class="secondary">Exécuter tests (smoke)</button>
-      </div>
-      <pre id="testOut" class="code" style="max-height:240px">Aucun test lancé.</pre>
-      <div class="footer">Tests de base: validation adresse & lecture du solde natif via RPC pour plusieurs chaînes. Ils ne garantissent pas la disponibilité des exploreurs.</div>
-    </section>
-
-    <p class="footer">⚠️ Ceci n'est pas un conseil financier. Prototype éducatif. Les API publiques peuvent limiter ou bloquer des requêtes depuis le navigateur (CORS/rate‑limit). Fournir sa propre clé API et/ou passer via un proxy serveur peut être nécessaire pour un usage intensif.</p>
+    <p class="footer">⚠️ Prototype éducatif. Pas de conseil financier. Certaines API peuvent limiter ou bloquer des requêtes depuis le navigateur (CORS/rate‑limit). Utilisez le proxy si besoin.</p>
   </div>
 
 <script>
 (function(){
+  // ===== Utilities & State =====
   const $ = (id)=>document.getElementById(id);
-  const state = { last: null };
-
+  const qs = (sel)=>document.querySelector(sel);
+  const qsa = (sel)=>Array.from(document.querySelectorAll(sel));
+  const state = { last:null, tokensOnchain:[], tokensHeu:[], prices:{}, approvals:[], lps:[], nfts:[], txs:[], internals:[] };
   const log = (...args)=>{ try{ const el = $('debugOut'); if(!el) return; const line = args.map(x=> typeof x==='string'? x : JSON.stringify(x)).join(' '); el.textContent += `\n`+ line; }catch(e){} };
-  log('[init] script chargé');
+  const isArr = Array.isArray;
+  const INFINITE = 1n << 255n;
 
+  // Chains & endpoints
   const CHAIN = {
-    eth: { name:'Ethereum', symbol:'ETH', explorer:'https://api.etherscan.io/api', unit:18, scan:'https://etherscan.io' },
-    polygon: { name:'Polygon', symbol:'MATIC', explorer:'https://api.polygonscan.com/api', unit:18, scan:'https://polygonscan.com' },
-    bsc: { name:'BSC', symbol:'BNB', explorer:'https://api.bscscan.com/api', unit:18, scan:'https://bscscan.com' },
-    arbitrum: { name:'Arbitrum One', symbol:'ETH', explorer:'https://api.arbiscan.io/api', unit:18, scan:'https://arbiscan.io' },
-    optimism: { name:'Optimism', symbol:'ETH', explorer:'https://api-optimistic.etherscan.io/api', unit:18, scan:'https://optimistic.etherscan.io' },
+    eth: { name:'Ethereum', chainId:1, symbol:'ETH', explorer:'https://api.etherscan.io/api', web:'https://etherscan.io', rpc:'https://cloudflare-eth.com', multicall3:'0xca11bde05977b3631167028862be2a173976ca11', positionManager:'0xC36442b4a4522E871399CD717aBDD847Ab11FE88' },
+    polygon: { name:'Polygon', chainId:137, symbol:'MATIC', explorer:'https://api.polygonscan.com/api', web:'https://polygonscan.com', rpc:'https://polygon-rpc.com', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
+    bsc: { name:'BSC', chainId:56, symbol:'BNB', explorer:'https://api.bscscan.com/api', web:'https://bscscan.com', rpc:'https://bsc-dataseed.binance.org/', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
+    arbitrum: { name:'Arbitrum One', chainId:42161, symbol:'ETH', explorer:'https://api.arbiscan.io/api', web:'https://arbiscan.io', rpc:'https://arb1.arbitrum.io/rpc', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
+    optimism: { name:'Optimism', chainId:10, symbol:'ETH', explorer:'https://api-optimistic.etherscan.io/api', web:'https://optimistic.etherscan.io', rpc:'https://mainnet.optimism.io', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
+    base: { name:'Base', chainId:8453, symbol:'ETH', explorer:'https://api.basescan.org/api', web:'https://basescan.org', rpc:'https://mainnet.base.org', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
+    avalanche: { name:'Avalanche', chainId:43114, symbol:'AVAX', explorer:'https://api.snowtrace.io/api', web:'https://snowtrace.io', rpc:'https://api.avax.network/ext/bc/C/rpc', multicall3:'0xca11bde05977b3631167028862be2a173976ca11' },
   };
 
-  // --- utils ---
-  const isArr = Array.isArray;
-  function safeArray(x){
-    if(isArr(x)) return x;
-    if(x && isArr(x.result)) return x.result;
-    if(x && typeof x === 'object') return Object.values(x).filter(v=> v != null);
-    return [];
+  // Known routers for allowance checks
+  const ROUTERS = {
+    eth: [
+      {addr:'0xE592427A0AEce92De3Edee1F18E0157C05861564', label:'Uniswap V3 Router'},
+      {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'},
+      {addr:'0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45', label:'Uniswap V2/V3 Router 02'}
+    ],
+    polygon: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+    bsc: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+    arbitrum: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+    optimism: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+    base: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+    avalanche: [ {addr:'0x1111111254fb6c44bac0bed2854e76f90643097d', label:'1inch Router'} ],
+  };
+
+  // Simple p-limit
+  async function pLimit(tasks, concurrency=6){
+    const q = [...tasks]; const running = new Set(); const results=[];
+    async function run(fn){ const p = Promise.resolve().then(fn).then(r=>{ running.delete(p); results.push(r); }).catch(e=>{ running.delete(p); results.push(Promise.reject(e)); }); running.add(p); if(running.size>=concurrency) await Promise.race(running); }
+    while(q.length) await run(q.shift()); await Promise.allSettled([...running]); return results; }
+
+  function fmt(n, d=6){ if(n===null||n===undefined||isNaN(n)) return '—'; const a=Math.abs(n); if(a>=1) return n.toLocaleString(undefined,{maximumFractionDigits:d}); if(a===0) return '0'; return n.toPrecision(3); }
+  function toDate(secs){ try{ return new Date(Number(secs)*1000).toLocaleString(); }catch(e){ return '—'; } }
+  function short(s){ s=String(s||''); return s.length>16? `${s.slice(0,8)}…${s.slice(-6)}`:s; }
+  function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c])); }
+
+  // Cache: simple Cache API + session fallback
+  const cacheOn = true;
+  async function cachedFetch(url, opts={}){
+    if(!cacheOn) return fetch(url, opts);
+    const req = new Request(url, opts);
+    const c = await caches.open('defi-inspector-v1');
+    const hit = await c.match(req);
+    if(hit) return hit;
+    const res = await fetch(url, opts);
+    try{ if(res.ok) c.put(req, res.clone()); }catch{}
+    return res;
   }
 
-  function fmt(n, digits=6){
-    if(n === null || n === undefined || isNaN(n)) return '—';
-    const a = Math.abs(n);
-    if(a >= 1) return n.toLocaleString(undefined,{maximumFractionDigits:digits});
-    if(a === 0) return '0';
-    return n.toPrecision(3);
-  }
-  function toDate(secs){ try{ return new Date(secs*1000).toLocaleString(); }catch(e){ return '—'; } }
+  // Proxy toggle
+  function proxify(url){ const use = $('togProxy').checked; if(!use) return url; return location.origin.replace(/\/$/,'') + '/proxy?url=' + encodeURIComponent(url); }
 
-  async function getNativeBalance(addr, chainKey, rpcUrl){
-    try{
-      const url = rpcUrl || getDefaultRPC(chainKey);
-      log('[rpc] using', url);
-      const provider = new ethers.JsonRpcProvider(url);
-      const bal = await provider.getBalance(addr);
-      return Number(ethers.formatEther(bal));
-    }catch(e){ log('[rpc:error]', e.message||e); return null; }
-  }
+  // ENS
+  async function tryENS(provider, addr){ try{ if(provider.network?.chainId !== 1) return null; const name = await provider.lookupAddress(addr); return name || null; }catch{return null;} }
 
-  function getDefaultRPC(chainKey){
-    switch(chainKey){
-      case 'eth': return 'https://cloudflare-eth.com';
-      case 'polygon': return 'https://polygon-rpc.com';
-      case 'bsc': return 'https://bsc-dataseed.binance.org/';
-      case 'arbitrum': return 'https://arb1.arbitrum.io/rpc';
-      case 'optimism': return 'https://mainnet.optimism.io';
-      default: return 'https://cloudflare-eth.com';
-    }
+  // Multicall helpers
+  const erc20Iface = new ethers.Interface([
+    'function balanceOf(address) view returns (uint256)',
+    'function decimals() view returns (uint8)',
+    'function symbol() view returns (string)',
+    'function allowance(address,address) view returns (uint256)'
+  ]);
+  const multicallIface = new ethers.Interface([
+    'function aggregate(tuple(address target, bytes callData)[] calls) view returns (uint256 blockNumber, bytes[] returnData)'
+  ]);
+
+  async function multicall(provider, chainKey, calls){
+    const mc = new ethers.Contract(CHAIN[chainKey].multicall3, multicallIface, provider);
+    const [,ret] = await mc.aggregate(calls);
+    return ret;
   }
 
-  // Expose pour le module LP
-  window.getDefaultRPC = getDefaultRPC;
-  window.state = state;
-
-  async function fetchExplorer(module, action, chainKey, params, apiKey){
+  // *scan fetch with retry/backoff and proxy
+  async function fetchScan(chainKey, params, apiKey, retries=2){
     const base = CHAIN[chainKey].explorer;
     const url = new URL(base);
-    url.searchParams.set('module', module);
-    url.searchParams.set('action', action);
     Object.entries(params||{}).forEach(([k,v])=> url.searchParams.set(k, v));
     if(apiKey) url.searchParams.set('apikey', apiKey);
-    log('[scan] GET', url.toString());
-    const res = await fetch(url.toString()).catch(err=>{ throw new Error('Fetch fail: '+(err.message||err)); });
-    if(!res.ok) throw new Error('Explorer HTTP '+res.status);
-    const json = await res.json();
-    if(json.status === '0' && typeof json.result === 'string'){
-      log('[scan:error]', json.message || 'error', json.result);
-      throw new Error(json.result);
+    const full = proxify(url.toString());
+    let attempt=0; let lastErr=null;
+    while(attempt<=retries){
+      try{
+        const res = await cachedFetch(full);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const json = await res.json();
+        if(json.status==='0' && typeof json.result==='string') throw new Error(json.result);
+        return json.result || [];
+      }catch(e){ lastErr=e; log('[scan:retry]', attempt, e.message||e); await new Promise(r=>setTimeout(r, 500*(attempt+1))); attempt++; }
     }
-    if(json.status === '0' && json.message && json.result) {
-      log('[scan:warn]', json.message, json.result);
-    }
-    return safeArray(json.result);
+    throw lastErr || new Error('scan failed');
   }
 
+  // Prices (DeFiLlama)
+  async function fetchPrices(defiKeys){
+    if(defiKeys.length===0) return {};
+    const url = 'https://coins.llama.fi/prices/current/' + defiKeys.join(',');
+    const res = await cachedFetch(proxify(url));
+    if(!res.ok) return {};
+    const json = await res.json().catch(()=>({}));
+    return json.coins || {};
+  }
+
+  // Sorting for tables
+  function enableSort(tableId){
+    const table = $(tableId); if(!table) return;
+    const ths = table.querySelectorAll('thead th[data-k]');
+    ths.forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const k = th.getAttribute('data-k');
+        const asc = th.dataset.asc !== 'true'; th.dataset.asc = String(asc);
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        rows.sort((a,b)=>{
+          const av = a.dataset[k] || ''; const bv = b.dataset[k] || '';
+          const an = parseFloat(av); const bn = parseFloat(bv);
+          const cmp = (isNaN(an)||isNaN(bn))? String(av).localeCompare(String(bv)) : (an-bn);
+          return asc? cmp : -cmp;
+        });
+        const tb = table.querySelector('tbody'); tb.innerHTML=''; rows.forEach(r=>tb.appendChild(r));
+      });
+    });
+  }
+
+  // Render helpers
+  function setRows(tableId, rows){ const tb = $(tableId).querySelector('tbody'); tb.innerHTML = rows.join(''); }
+
+  function linkScan(chainKey, type, value){ const base = CHAIN[chainKey].web; switch(type){
+    case 'tx': return `${base}/tx/${value}`;
+    case 'address': return `${base}/address/${value}`;
+    case 'token': return `${base}/token/${value}`;
+    default: return base;
+  } }
+
+  // Heuristic aggregation (kept as secondary tab)
   function aggregateTokenTransfers(transfers, address){
     const lower = (address||'').toLowerCase();
     const map = new Map();
-    for(const t of safeArray(transfers)){
-      const ca = (t && t.contractAddress) ? String(t.contractAddress).toLowerCase() : null;
-      const to = (t && t.to) ? String(t.to).toLowerCase() : '';
-      const from = (t && t.from) ? String(t.from).toLowerCase() : '';
-      const valStr = t && t.value != null ? String(t.value) : null;
-      if(!ca || !valStr) continue; // ignore malformed rows
-      let val = 0n; try{ val = BigInt(valStr); }catch(e){ continue; }
-      const prev = map.get(ca) || { contract: ca, symbol: t && t.tokenSymbol || 'UNK', decimals: Number(t && t.tokenDecimal || 18), rawIn:0n, rawOut:0n };
-      if(to === lower) prev.rawIn += val; else if(from === lower) prev.rawOut += val;
-      map.set(ca, prev);
+    for(const t of (transfers||[])){
+      const ca = t?.contractAddress?.toLowerCase?.(); if(!ca) continue;
+      const to = (t?.to||'').toLowerCase(); const from = (t?.from||'').toLowerCase();
+      const valStr = t?.value; if(valStr==null) continue; let val=0n; try{ val = BigInt(String(valStr)); }catch{}
+      const prev = map.get(ca) || { contract:ca, symbol: t?.tokenSymbol || 'UNK', decimals: Number(t?.tokenDecimal || 18), rawIn:0n, rawOut:0n };
+      if(to===lower) prev.rawIn += val; else if(from===lower) prev.rawOut += val; map.set(ca, prev);
     }
-    const rows = [];
-    for(const v of map.values()){
-      const net = v.rawIn - v.rawOut; // BigInt
-      let balanceFmt = NaN;
-      try{ balanceFmt = Number(ethers.formatUnits(net, isFinite(v.decimals)? v.decimals : 18)); }catch(e){}
-      rows.push({ token: v.symbol || 'UNK', contract: v.contract, decimals: isFinite(v.decimals)? v.decimals : 18, balance_raw: net.toString(), balance_fmt: balanceFmt });
+    const rows=[]; for(const v of map.values()){ const net=v.rawIn-v.rawOut; let fmtVal=NaN; try{ fmtVal=Number(ethers.formatUnits(net, isFinite(v.decimals)?v.decimals:18)); }catch{} rows.push({ token:v.symbol||'UNK', contract:v.contract, decimals:isFinite(v.decimals)?v.decimals:18, net_raw: net.toString(), net_fmt: fmtVal }); }
+    return rows.sort((a,b)=> (b.net_fmt||0)-(a.net_fmt||0));
+  }
+
+  // Allowances via multicall
+  async function readAllowances(provider, owner, tokens, chainKey){
+    const calls=[]; const routers = ROUTERS[chainKey]||[]; if(routers.length===0) return [];
+    for(const t of tokens){ for(const r of routers){ calls.push([t.contract, erc20Iface.encodeFunctionData('allowance',[owner, r.addr])]); } }
+    const ret = await multicall(provider, chainKey, calls);
+    const out=[]; let i=0;
+    for(const t of tokens){ for(const r of routers){ const a = erc20Iface.decodeFunctionResult('allowance', ret[i++])[0]; const infinite = a >= INFINITE; if(infinite || a>0n){ out.push({ token:t.symbol, contract:t.contract, spender:r.addr, label:r.label, allowance: a.toString(), infinite }); } } }
+    return out;
+  }
+
+  // Uniswap v3 positions: enumerate via ERC721 transfers from *scan, then read positions()
+  const posIface = new ethers.Interface([
+    'function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)'
+  ]);
+
+  async function loadUniV3Positions(provider, chainKey, owner, apiKey){
+    const pm = CHAIN[chainKey].positionManager; if(!pm) return [];
+    // fetch ERC721 transfers involving owner & PositionManager
+    let txs=[]; try{ txs = await fetchScan(chainKey, {module:'account', action:'tokennfttx', address: owner, contractaddress: pm, sort:'desc', page:1, offset:200}, apiKey); }catch(e){ log('[v3:nfttx:error]', e.message||e); return []; }
+    const ids = new Set(); for(const t of (txs||[])){ const id = t?.tokenID; if(id) ids.add(id); }
+    const calls=[]; for(const id of ids){ calls.push([pm, posIface.encodeFunctionData('positions',[id])]); }
+    if(calls.length===0) return [];
+    const ret = await multicall(provider, chainKey, calls);
+    const rows=[]; let i=0; for(const id of ids){ try{ const r = posIface.decodeFunctionResult('positions', ret[i++]); rows.push({ id, token0:r.token0, token1:r.token1, fee:Number(r.fee), tickLower:Number(r.tickLower), tickUpper:Number(r.tickUpper), liquidity: r.liquidity.toString() }); }catch(e){ i++; } }
+    return rows;
+  }
+
+  // NFTs summary (721/1155) via tokennfttx (basic, no on-chain enumeration)
+  async function loadNFTs(chainKey, owner, apiKey){
+    let txs=[]; try{ txs = await fetchScan(chainKey, {module:'account', action:'tokennfttx', address: owner, sort:'desc', page:1, offset:200}, apiKey); }catch(e){ log('[nft:error]', e.message||e); return []; }
+    const map = new Map();
+    for(const t of (txs||[])){
+      const ca = t?.contractAddress?.toLowerCase?.(); if(!ca) continue;
+      const sym = t?.tokenSymbol || 'NFT'; const id = t?.tokenID || '?';
+      const prev = map.get(ca) || { contract:ca, symbol:sym, items:new Set() };
+      prev.items.add(id); map.set(ca, prev);
     }
-    return rows.sort((a,b)=> (b.balance_fmt||0)-(a.balance_fmt||0));
+    return [...map.values()].map(x=>({ contract:x.contract, symbol:x.symbol, tokens:[...x.items].slice(0,10) }));
   }
 
-  function renderTokens(rows){
-    const tbody = $('tblTokens').querySelector('tbody');
-    tbody.innerHTML = safeArray(rows).map(r=>{
-      const bal = isFinite(r.balance_fmt) ? fmt(r.balance_fmt, 6) : r.balance_raw;
-      return `<tr>
-        <td><strong>${escapeHtml(r.token)}</strong></td>
-        <td class="mono"><a href="#" data-contract="${r.contract}">${r.contract.slice(0,8)}…${r.contract.slice(-6)}</a></td>
-        <td class="mono">${r.decimals}</td>
-        <td class="mono">${bal}</td>
-      </tr>`;
-    }).join('');
+  // Internal tx
+  async function loadInternals(chainKey, owner, apiKey){
+    try{ const r = await fetchScan(chainKey, {module:'account', action:'txlistinternal', address: owner, sort:'desc', page:1, offset:100}, apiKey); return r||[]; }catch(e){ log('[internals:error]', e.message||e); return []; }
   }
 
-  function renderTxs(txs, chainKey){
-    const tbody = $('tblTxs').querySelector('tbody');
-    const scan = CHAIN[chainKey].scan;
-    const short = (s)=>{ s = (s||''); return s.length>16 ? `${s.slice(0,8)}…${s.slice(-6)}` : s; };
-    const list = safeArray(txs);
-    tbody.innerHTML = list.map(t=>{
-      const hash = t.hash || t.txhash || t.transactionHash || '';
-      const link = hash ? `${scan}/tx/${hash}` : '#';
-      const from = t.from || '';
-      const to = t.to || '';
-      const value = t.value ? Number(t.value)/1e18 : 0;
-      const ts = t.timeStamp ? Number(t.timeStamp) : (t.timeStampSec||0);
-      return `<tr>
-        <td>${toDate(ts)}</td>
-        <td class="mono"><a href="${link}" target="_blank" rel="noopener">${short(hash)}</a></td>
-        <td class="mono">${from ? short(from) : '—'}</td>
-        <td class="mono">${to ? short(to) : '—'}</td>
-        <td class="mono">${fmt(value,6)}</td>
-        <td class="mono">${t.nonce ?? '—'}</td>
-        <td class="mono">${t.blockNumber ?? '—'}</td>
-      </tr>`;
-    }).join('');
-  }
+  // Prices mapping helper
+  function toDefiKey(chainKey, tokenAddr){ const chainMap={eth:'ethereum', polygon:'polygon', bsc:'bsc', arbitrum:'arbitrum', optimism:'optimism', base:'base', avalanche:'avax'}; const chain = chainMap[chainKey]; if(!chain) return null; return `${chain}:${tokenAddr.toLowerCase()}`; }
 
-  function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c])); }
-
-  function enableExports(data){
-    const btnJ = $('btnExportJSON');
-    const btnC = $('btnExportCSV');
-    btnJ.disabled = false;
-    btnC.disabled = !(Array.isArray(data.tokens) && data.tokens.length>0);
-    btnJ.onclick = ()=> downloadBlob(JSON.stringify(data,null,2), 'wallet_report.json', 'application/json');
-    btnC.onclick = ()=> downloadBlob(toCSV(data), 'wallet_tokens.csv', 'text/csv');
-  }
-
-  function downloadBlob(content, fileName, contentType){
-    const blob = new Blob([content], {type: contentType});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    setTimeout(()=> URL.revokeObjectURL(url), 2500);
-  }
-
-  function toCSV(data){
-    const rows = safeArray(data.tokens);
-    const head = ['token','contract','decimals','balance_raw','balance_fmt'];
-    const csv = [head.join(',')].concat(rows.map(r=> head.map(k=> JSON.stringify(r[k]??'')).join(',')));
-    return csv.join('\n');
-  }
-
+  // ===== Main flow =====
   async function onInspect(){
-    const addr = $('inpAddress').value.trim();
+    const addrInput = $('inpAddress').value.trim();
     const chainKey = $('selChain').value;
     const apiKey = $('inpApiKey').value.trim();
-    const rpc = $('inpRpc').value.trim();
+    const rpc = $('inpRpc').value.trim() || CHAIN[chainKey].rpc;
 
-    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)) { alert('Adresse EVM invalide.'); return; }
+    // Resolve ENS if provided
+    let address = addrInput;
+    const provider = new ethers.JsonRpcProvider(rpc, CHAIN[chainKey].chainId);
+    if(/\.eth$/.test(address) && chainKey==='eth'){ try{ const r = await provider.resolveName(address); if(r) address = r; }catch(e){ log('[ens:resolve:error]', e.message||e); } }
+    if(!/^0x[0-9a-fA-F]{40}$/.test(address)) { alert('Adresse EVM invalide.'); return; }
 
     $('btnInspect').disabled = true; $('btnSpin').style.display='inline-block'; $('btnText').textContent = 'Chargement…';
 
     try{
-      log('[inspect] start', {addr, chainKey});
       const chain = CHAIN[chainKey];
-
-      // 1) Solde natif via RPC
-      const native = await getNativeBalance(addr, chainKey, rpc);
-
-      // 2) Transactions récentes via *scan (desc, max 100)
-      let txs = [];
-      try{ txs = await fetchExplorer('account','txlist', chainKey, { address: addr, startblock:0, endblock:99999999, page:1, offset:100, sort:'desc' }, apiKey); }
-      catch(e){ log('[scan:txlist:error]', e.message||e); }
-      txs = safeArray(txs).slice(0,100);
-
-      // 3) Transferts ERC20 pour heuristique de solde
-      let transfers = [];
-      try{ transfers = await fetchExplorer('account','tokentx', chainKey, { address: addr, page:1, offset:100 }, apiKey); }
-      catch(e){ log('[scan:tokentx:error]', e.message||e); }
-      transfers = safeArray(transfers);
-      const tokens = aggregateTokenTransfers(transfers, addr);
-
-      const report = { chain: chain.name, chain_key: chainKey, address: addr, native_balance: native, native_symbol: chain.symbol, tokens, txs, generated_at: new Date().toISOString() };
-
-      // Render KPIs
+      log('[inspect] start', {address, chainKey});
       $('kpiChain').textContent = chain.name;
-      $('kpiNative').textContent = native!=null ? `${fmt(native,6)} ${chain.symbol}` : '—';
-      $('kpiTx').textContent = txs.length;
+      $('thNative').textContent = `Valeur (${chain.symbol})`;
+
+      // Native balance
+      const nativeBal = await provider.getBalance(address).then(b=>Number(ethers.formatEther(b))).catch(()=>null);
+      $('kpiNative').textContent = nativeBal!=null ? `${fmt(nativeBal,6)} ${chain.symbol}` : '—';
+
+      // ENS reverse
+      const ens = await tryENS(provider, address); $('kpiEns').textContent = ens? `${ens} / ${short(address)}` : short(address);
+
+      // 1) *scan data: txs, token transfers, internals (with retry)
+      let [txs, tokentx, internals] = await Promise.all([
+        fetchScan(chainKey, {module:'account', action:'txlist', address, startblock:0, endblock:99999999, page:1, offset:100, sort:'desc'}, apiKey).catch(e=>{ log('[scan:txlist:error]', e.message||e); return []; }),
+        fetchScan(chainKey, {module:'account', action:'tokentx', address, page:1, offset:200, sort:'desc'}, apiKey).catch(e=>{ log('[scan:tokentx:error]', e.message||e); return []; }),
+        loadInternals(chainKey, address, apiKey)
+      ]);
+      state.txs = txs; state.internals = internals;
+
+      // 2) Heuristic tokens for discovery
+      const tokensHeu = aggregateTokenTransfers(tokentx, address); state.tokensHeu = tokensHeu;
+
+      // 3) On-chain ERC20 balances via Multicall3 (for discovered contracts)
+      const uniqContracts = [...new Set(tokensHeu.map(t=>t.contract).filter(Boolean))].slice(0,200);
+      const calls=[]; for(const ca of uniqContracts){ calls.push([ca, erc20Iface.encodeFunctionData('decimals', [])]); calls.push([ca, erc20Iface.encodeFunctionData('symbol', [])]); calls.push([ca, erc20Iface.encodeFunctionData('balanceOf', [address])]); }
+      let tokensOn=[];
+      if(calls.length>0){
+        try{
+          const ret = await multicall(provider, chainKey, calls);
+          for(let i=0;i<uniqContracts.length;i++){
+            const decR = ret[i*3+0], symR = ret[i*3+1], balR = ret[i*3+2];
+            let decimals=18, symbol='UNK', balance=0n;
+            try{ decimals = Number(erc20Iface.decodeFunctionResult('decimals', decR)[0] || 18); }catch{}
+            try{ symbol = erc20Iface.decodeFunctionResult('symbol', symR)[0] || 'UNK'; }catch{}
+            try{ balance = erc20Iface.decodeFunctionResult('balanceOf', balR)[0] || 0n; }catch{}
+            tokensOn.push({ contract: uniqContracts[i], symbol, decimals, balance_raw: balance.toString(), balance_fmt: Number(ethers.formatUnits(balance, decimals)) });
+          }
+          tokensOn = tokensOn.filter(t=> t.balance_raw !== '0');
+        }catch(e){ log('[multicall:error]', e.message||e); }
+      }
+      state.tokensOnchain = tokensOn;
+
+      // 4) Allowances
+      const approvals = await readAllowances(provider, address, tokensOn, chainKey).catch(e=>{ log('[allow:error]', e.message||e); return []; });
+      state.approvals = approvals;
+
+      // 5) Prices (DeFiLlama)
+      const priceKeys = tokensOn.map(t=> toDefiKey(chainKey, t.contract)).filter(Boolean);
+      const priceMap = await fetchPrices(priceKeys);
+      state.prices = priceMap;
+      for(const t of tokensOn){ const key = toDefiKey(chainKey, t.contract); const p = priceMap[key]?.price; t.price_usd = typeof p==='number'? p : null; t.value_usd = (t.price_usd!=null)? t.balance_fmt * t.price_usd : null; }
+
+      // 6) LPs v2/v3 — v3 via PositionManager
+      const v3 = await loadUniV3Positions(provider, chainKey, address, apiKey); state.lps = v3; // (v2 détection avancée optionnelle)
+
+      // 7) NFTs
+      state.nfts = await loadNFTs(chainKey, address, apiKey);
 
       // Render tables
-      renderTokens(tokens);
-      renderTxs(txs, chainKey);
+      renderTokens(chainKey, tokensOn);
+      renderTokensHeu(chainKey, tokensHeu);
+      renderTxs(chainKey, txs);
+      renderInternals(chainKey, internals);
+      renderApprovals(chainKey, approvals);
+      renderLP(chainKey, v3);
+      renderNFTs(chainKey, state.nfts);
 
-      // Ajuster l'intitulé de la colonne Valeur en fonction de la chaîne
-      const thVal = document.querySelector('#tblTxs thead th:nth-child(5)');
-      if(thVal){ thVal.textContent = `Valeur (${chain.symbol})`; }
-
-      // Détection LP
-      if(window.detectLPPositions){
-        try{ await detectLPPositions(report, rpc); log('[lp] done'); }
-        catch(e){ log('[lp:error]', e.message||e); }
-      }
-
-      // JSON
-      $('jsonOut').textContent = JSON.stringify(report, null, 2);
+      // JSON export
+      const report = { chain:chain.name, chain_key:chainKey, address, ens, native_balance:nativeBal, native_symbol:chain.symbol, tokens_onchain:tokensOn, tokens_heuristic:tokensHeu, approvals, prices:priceMap, txs, internals, lps_v3:v3, nfts:state.nfts, generated_at:new Date().toISOString() };
+      $('jsonOut').textContent = JSON.stringify(report,null,2);
       enableExports(report);
-      state.last = report;
+
       log('[inspect] done');
-    }catch(e){
-      console.error(e);
-      log('[inspect:error]', e.message||e);
-      alert('Erreur: '+ (e.message||e));
-    }finally{
-      $('btnInspect').disabled = false; $('btnSpin').style.display='none'; $('btnText').textContent = 'Inspecter';
-    }
+    }catch(e){ console.error(e); log('[inspect:error]', e.message||e); alert('Erreur: '+(e.message||e)); }
+    finally{ $('btnInspect').disabled=false; $('btnSpin').style.display='none'; $('btnText').textContent='Inspecter'; }
   }
 
-  // --- tests ---
-  async function runTests(){
-    const out = $('testOut');
-    const lines = [];
-    function push(msg){ lines.push(msg); out.textContent = lines.join('\n'); }
+  // Renderers
+  function renderTokens(chainKey, arr){ const rows = (arr||[]).map(r=>{
+    const price = r.price_usd!=null? `$${fmt(r.price_usd,6)}`:'—'; const val = r.value_usd!=null? `$${fmt(r.value_usd,2)}`:'—';
+    return `<tr data-symbol="${escapeHtml(r.symbol)}" data-contract="${r.contract}" data-decimals="${r.decimals}" data-balance_fmt="${r.balance_fmt}" data-price_usd="${r.price_usd??''}" data-value_usd="${r.value_usd??''}">
+      <td>${escapeHtml(r.symbol)}</td>
+      <td class="mono"><a href="${linkScan(chainKey,'token',r.contract)}" target="_blank" rel="noopener">${r.contract.slice(0,8)}…${r.contract.slice(-6)}</a></td>
+      <td>${r.decimals}</td>
+      <td class="mono">${fmt(r.balance_fmt,6)}</td>
+      <td class="mono">${price}</td>
+      <td class="mono">${val}</td>
+    </tr>`; }); setRows('tblTokens', rows); enableSort('tblTokens'); }
 
-    // Smoke tests lecture RPC
-    const samples = [
-      { chain:'eth', addr:'0x742d35Cc6634C0532925a3b844Bc454e4438f44e' }, // Whale wallet
-      { chain:'polygon', addr:'0x0000000000000000000000000000000000001010' }, // MATIC token contract (lecture RPC ok)
-      { chain:'bsc', addr:'0x0000000000000000000000000000000000000000' }, // zero addr
-    ];
+  function renderTokensHeu(chainKey, arr){ const rows = (arr||[]).map(r=>{
+    return `<tr>
+      <td>${escapeHtml(r.token)}</td>
+      <td class="mono"><a href="${linkScan(chainKey,'token',r.contract)}" target="_blank" rel="noopener">${r.contract.slice(0,8)}…${r.contract.slice(-6)}</a></td>
+      <td>${r.decimals}</td>
+      <td class="mono">${isFinite(r.net_fmt)? fmt(r.net_fmt,6): r.net_raw}</td>
+    </tr>`; }); setRows('tblTokensHeu', rows); }
 
-    push('Démarrage smoke tests RPC...');
-    for(const s of samples){
-      try{
-        push(`→ Test ${s.chain} ${s.addr.slice(0,10)}…`);
-        const bal = await getNativeBalance(s.addr, s.chain);
-        push(`   Solde natif lu: ${bal!==null? bal : 'null'} (OK)`);
-      }catch(e){
-        push(`   [ERREUR] ${e.message||e}`);
-      }
-    }
+  function tagTx(t){ if(!t?.input||t.input==='0x') return ''; const data=t.input.toLowerCase(); if(data.startsWith('0x095ea7b3')) return 'Approval'; if(data.startsWith('0xf305d719')||data.startsWith('0xe8e33700')) return 'DEX'; return ''; }
 
-    // Tests unitaires safeArray / renderTxs normalization
-    push('Tests normalisation de tableaux...');
-    const weirds = [null, undefined, {}, {result:[]}, {a:1,b:2}, 'oops', 123, [{hash:'0x1'}]];
-    for(const w of weirds){
-      try{
-        const arr = safeArray(w);
-        if(!Array.isArray(arr)) throw new Error('safeArray did not return array');
-        // simulate render
-        renderTxs(arr, 'eth');
-        push(`   ok: input=${typeof w} → length=${arr.length}`);
-      }catch(e){
-        push(`   [ERREUR normalize] ${e.message||e}`);
-      }
-    }
+  function renderTxs(chainKey, arr){ const rows=(arr||[]).map(t=>{
+    const link = linkScan(chainKey,'tx',t.hash||t.txhash||t.transactionHash||'');
+    const from = t.from||''; const to = t.to||''; const ts = t.timeStamp?Number(t.timeStamp):0; const val = t.value? Number(t.value)/1e18 : 0;
+    const tag = tagTx(t);
+    return `<tr data-timeStamp="${ts}">
+      <td>${toDate(ts)}</td>
+      <td class="mono"><a href="${link}" target="_blank" rel="noopener">${short(t.hash||t.txhash||t.transactionHash||'')}</a></td>
+      <td class="mono"><a href="${linkScan(chainKey,'address',from)}" target="_blank" rel="noopener">${short(from)}</a></td>
+      <td class="mono"><a href="${linkScan(chainKey,'address',to)}" target="_blank" rel="noopener">${short(to)}</a></td>
+      <td class="mono">${fmt(val,6)}</td>
+      <td class="mono">${t.nonce ?? '—'}</td>
+      <td class="mono">${t.blockNumber ?? '—'}</td>
+      <td>${tag}</td>
+    </tr>`; }); setRows('tblTxs', rows); enableSort('tblTxs'); }
 
-    push('Tests terminés.');
+  function renderInternals(chainKey, arr){ const rows=(arr||[]).map(t=>{
+    const link = linkScan(chainKey,'tx',t.hash||t.parentHash||''); const from=t.from||''; const to=t.to||''; const ts=Number(t.timeStamp||0); const val=t.value? Number(t.value)/1e18 : 0;
+    return `<tr>
+      <td>${toDate(ts)}</td>
+      <td class="mono"><a href="${link}" target="_blank" rel="noopener">${short(t.hash||t.parentHash||'')}</a></td>
+      <td class="mono"><a href="${linkScan(chainKey,'address',from)}" target="_blank" rel="noopener">${short(from)}</a></td>
+      <td class="mono"><a href="${linkScan(chainKey,'address',to)}" target="_blank" rel="noopener">${short(to)}</a></td>
+      <td class="mono">${fmt(val,6)}</td>
+      <td class="mono">${t.type||'—'}</td>
+    </tr>`; }); setRows('tblInternals', rows); }
+
+  function renderApprovals(chainKey, arr){ const rows=(arr||[]).map(a=>{
+    const alert = a.infinite? '<span class="warn">infinite</span>' : (Number(a.allowance)>0? '<span class="ok">ok</span>':'—');
+    return `<tr>
+      <td>${escapeHtml(a.token)}</td>
+      <td class="mono"><a href="${linkScan(chainKey,'token',a.contract)}" target="_blank" rel="noopener">${short(a.contract)}</a></td>
+      <td class="mono"><a href="${linkScan(chainKey,'address',a.spender)}" target="_blank" rel="noopener">${short(a.spender)}</a></td>
+      <td>${escapeHtml(a.label||'')}</td>
+      <td class="mono">${a.allowance}</td>
+      <td>${alert}</td>
+    </tr>`; }); setRows('tblApprovals', rows); }
+
+  function renderLP(chainKey, v3){ const rows=[]; for(const p of (v3||[])){
+    rows.push(`<tr><td>Uni v3</td><td class="mono">#${p.id}</td><td>fee: ${p.fee/10000}% \u2014 [${p.tickLower}, ${p.tickUpper}]</td><td class="mono">liq: ${p.liquidity}</td><td class="mono"><a href="${linkScan(chainKey,'address',CHAIN[chainKey].positionManager)}" target="_blank" rel="noopener">PositionManager</a></td></tr>`);
+  } setRows('tblLP', rows); }
+
+  function renderNFTs(chainKey, arr){ const rows=(arr||[]).map(n=>{
+    return `<tr>
+      <td>${escapeHtml(n.symbol)}</td>
+      <td class="mono"><a href="${linkScan(chainKey,'token',n.contract)}" target="_blank" rel="noopener">${short(n.contract)}</a></td>
+      <td class="mono">${n.tokens.join(', ')}</td>
+    </tr>`; }); setRows('tblNFTs', rows); }
+
+  // Exports
+  function enableExports(report){
+    const btnJ=$('btnExportJSON'); const btnC=$('btnExportCSV'); btnJ.disabled=false; btnC.disabled=false;
+    btnJ.onclick=()=> downloadBlob(JSON.stringify(report,null,2), 'wallet_report.json', 'application/json');
+    btnC.onclick=()=>{
+      const head=['symbol','contract','decimals','balance_fmt','price_usd','value_usd'];
+      const rows = (report.tokens_onchain||[]).map(r=> head.map(k=> JSON.stringify(r[k]??'')).join(','));
+      const csv=[head.join(',')].concat(rows).join('\n');
+      downloadBlob(csv,'wallet_tokens.csv','text/csv');
+    };
   }
+  function downloadBlob(content, fileName, contentType){ const blob=new Blob([content],{type:contentType}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=fileName; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2500); }
 
+  // Tabs & filter
+  function switchTab(name){ qsa('[data-view]').forEach(s=> s.classList.toggle('hidden', s.getAttribute('data-view')!==name)); qsa('.tab').forEach(t=> t.classList.toggle('active', t.getAttribute('data-tab')===name)); }
+  document.addEventListener('click', (e)=>{ const t=e.target.closest('.tab'); if(!t) return; switchTab(t.getAttribute('data-tab')); });
+  $('fltToken').addEventListener('input', ()=>{
+    const q = $('fltToken').value.toLowerCase(); const rows = qsa('#tblTokens tbody tr');
+    rows.forEach(r=>{ const sym=(r.dataset.symbol||'').toLowerCase(); const ca=(r.dataset.contract||'').toLowerCase(); r.style.display = (sym.includes(q)||ca.includes(q))? '': 'none'; });
+  });
+
+  // Boot
   document.addEventListener('DOMContentLoaded', ()=>{
-    const b = $('btnInspect'); if(b){ b.addEventListener('click', onInspect); log('[dom] bouton prêt'); }
-    const tb = $('btnRunTests'); if(tb){ tb.addEventListener('click', runTests); }
-    // Ouvrir les contrats token dans l'explorer
-    document.addEventListener('click', (e)=>{
-      const a = e.target.closest('a[data-contract]');
-      if(!a) return;
-      e.preventDefault();
-      const c = a.getAttribute('data-contract');
-      const chainKey = document.getElementById('selChain').value;
-      const url = CHAIN[chainKey].scan + '/token/' + c;
-      window.open(url, '_blank', 'noopener');
-    });
+    $('btnInspect').addEventListener('click', onInspect);
+    if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('./sw.js'); }catch(e){} }
   });
 })();
 </script>
-<!-- START: LP detection module injected -->
-<script>
-(function(){
-  const PAIR_ABI = [
-    "function token0() view returns (address)",
-    "function token1() view returns (address)",
-    "function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
-    "function totalSupply() view returns (uint256)",
-    "function balanceOf(address owner) view returns (uint256)",
-    "function decimals() view returns (uint8)"
-  ];
-
-  // Petit annuaire de farms connus (MasterChef / staking) par chaîne
-  const KNOWN_FARMS = {
-    eth: {
-      // exemples
-      // "0xC2EdBa...": "Sushi MasterChef (ETH)"
-    },
-    polygon: {
-      // "0x0769fd68dFb93167989C6f7254cd0D766Fb2841F": "Sushi MasterChef V2 (Polygon)"
-    },
-    bsc: {
-      "0x73feaa1eE314F8c655E354234017bE2193C9E24E": "PancakeSwap MasterChef V1",
-      "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652": "PancakeSwap MasterChef V2"
-    },
-    arbitrum: {
-      // "0x5fe5cC0122403f06eBAF8f647E1eBEcEbA5f3e9d": "Sushi MiniChef (Arbitrum)"
-    },
-    optimism: {
-      // ajouter des adresses si besoin
-    }
-  };
-  function labelKnownFarm(chainKey, addr){
-    const m = KNOWN_FARMS[chainKey] || {}; const name = m[(addr||'').toLowerCase()] || m[addr] || null; return name || null;
-  }
-
-  async function isPairContract(provider, addr){
-    try{ const c = new ethers.Contract(addr, ["function token0() view returns (address)"], provider); await c.token0(); return true; }catch(e){ return false; }
-  }
-  async function inspectPair(provider, pairAddress, wallet){
-    const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
-    try{
-      const [token0, token1, reserves, totalSupply, balRaw] = await Promise.all([ pair.token0(), pair.token1(), pair.getReserves(), pair.totalSupply(), pair.balanceOf(wallet) ]);
-      const decimals0 = await tryDecimals(provider, token0);
-      const decimals1 = await tryDecimals(provider, token1);
-      const reserve0 = BigInt(reserves.reserve0.toString());
-      const reserve1 = BigInt(reserves.reserve1.toString());
-      const total = BigInt(totalSupply.toString());
-      const balance = BigInt(balRaw.toString());
-      const amount0 = total === 0n ? 0n : (balance * reserve0) / total;
-      const amount1 = total === 0n ? 0n : (balance * reserve1) / total;
-      return { pair: pairAddress, token0, token1, decimals0, decimals1, reserve0: reserve0.toString(), reserve1: reserve1.toString(), totalSupply: total.toString(), balanceLP: balance.toString(), underlying0: amount0.toString(), underlying1: amount1.toString() };
-    }catch(err){ return null; }
-  }
-  async function tryDecimals(provider, token){ try{ const c = new ethers.Contract(token, ["function decimals() view returns (uint8)"], provider); return Number(await c.decimals()); }catch(e){ return 18; } }
-  async function detectSentLPToContracts(txs, lpContracts, provider, walletLower){
-    const candidates = new Map();
-    for(const t of (Array.isArray(txs)? txs : [])){
-      const k = (t.contractAddress||'').toLowerCase(); if(!k || !lpContracts.has(k)) continue;
-      if((t.from||'').toLowerCase() === walletLower){
-        const to = (t.to||'').toLowerCase();
-        try{ const code = await provider.getCode(to); if(code && code !== '0x'){ const e = candidates.get(to) || {count:0,lastTs:0}; e.count++; e.lastTs = Math.max(e.lastTs, Number(t.timeStamp||0)); candidates.set(to, e); } }catch(e){}
-      }
-    }
-    return candidates;
-  }
-  function bigIntToFloatStr(bigStr, decimals=18){ try{ const v = BigInt(bigStr); if(v===0n) return '0'; const a=v<0n?-v:v; const s=a.toString().padStart(decimals+1,'0'); const intPart=s.slice(0,-decimals)||'0'; const frac=(s.slice(-decimals).replace(/0+$/,'')||'0'); const out=`${intPart}.${frac}`; return out.length>18?out.slice(0,18):out; }catch(e){ return bigStr; } }
-  function renderLPResults(rows){
-    let el = document.getElementById('lpResultsCard');
-    if(!el){ el = document.createElement('section'); el.id='lpResultsCard'; el.className='card'; el.style.marginTop='16px'; el.innerHTML = '<h3 style="margin:0 0 10px">Positions LP détectées</h3><div style="overflow:auto"><table id="tblLPs"><thead><tr><th>Pair (contrat)</th><th>Token0</th><th>Token1</th><th>LP détenue</th><th>Sous-jacent token0</th><th>Sous-jacent token1</th><th>Retirer depuis</th></tr></thead><tbody></tbody></table></div>'; const anchor = document.getElementById('jsonOut').parentElement; document.querySelector('.container').insertBefore(el, anchor); }
-    const tbody = document.querySelector('#tblLPs tbody');
-    const chainKey = (window.state && window.state.last && window.state.last.chain_key) || (document.getElementById('selChain')?.value || 'eth');
-    tbody.innerHTML = (Array.isArray(rows)? rows : []).map(r=>{
-      const token0 = r.token0.slice(0,8)+'…'+r.token0.slice(-6);
-      const token1 = r.token1.slice(0,8)+'…'+r.token1.slice(-6);
-      const pair = r.pair;
-      const lpFmt = bigIntToFloatStr(r.balanceLP, r.decimalsLP ?? 18);
-      const u0 = bigIntToFloatStr(r.underlying0, r.decimals0 || 18);
-      const u1 = bigIntToFloatStr(r.underlying1, r.decimals1 || 18);
-      const withdrawAddr = (r.withdrawAddress || pair).toLowerCase();
-      const farmName = labelKnownFarm(chainKey, withdrawAddr);
-      const label = farmName ? farmName : withdrawAddr.slice(0,8)+'…'+withdrawAddr.slice(-6);
-      return `<tr><td class="mono"><a href="#" data-contract="${pair}">${pair.slice(0,8)}…</a></td><td class="mono">${token0}</td><td class="mono">${token1}</td><td class="mono">${lpFmt}</td><td class="mono">${u0}</td><td class="mono">${u1}</td><td class="mono">${label}</td></tr>`;
-    }).join('');
-  }
-  window.detectLPPositions = async function(report, rpcUrl){
-    const chain = (report.chain_key || 'eth');
-    const fallback = (typeof getDefaultRPC === 'function') ? getDefaultRPC(chain) : 'https://cloudflare-eth.com';
-    const provider = new ethers.JsonRpcProvider(rpcUrl || fallback);
-    const wallet = report.address; const walletLower = wallet.toLowerCase();
-    const tokenContracts = (Array.isArray(report.tokens)? report.tokens : []).map(t=> (t.contract||'').toLowerCase()).filter(Boolean);
-    const tokenSet = new Set(tokenContracts);
-    const txs = Array.isArray(report.txs) ? report.txs : [];
-    const lpFound = []; const lpSet = new Set();
-    for(const c of tokenSet){ try{ if(await isPairContract(provider, c)){ const info = await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ info.decimalsLP=18; lpFound.push(info); lpSet.add(c); } } }catch(e){} }
-    for(const t of txs){ const c=(t.contractAddress||'').toLowerCase(); if(!c || lpSet.has(c)) continue; try{ if(await isPairContract(provider, c)){ const info=await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ lpFound.push(info); lpSet.add(c); } } }catch(e){} }
-    const sentToContracts = await detectSentLPToContracts(txs, lpSet, provider, walletLower);
-    const rows = lpFound.map(l=>{ const pair=l.pair.toLowerCase(); const withdrawAddress = (BigInt(l.balanceLP||'0')>0n)? pair : null; return Object.assign({}, l, { withdrawAddress }); });
-    for(const [contractAddr, info] of sentToContracts.entries()){
-      rows.forEach(r=>{ const found = (txs||[]).find(t=> (t.contractAddress||'').toLowerCase()===r.pair.toLowerCase() && (t.to||'').toLowerCase()===contractAddr.toLowerCase()); if(found){ if(BigInt(r.balanceLP||'0')===0n){ r.withdrawAddress = contractAddr; r.staked = true; r.stakedInfo = info; } else { r.possibleStaking = r.possibleStaking || []; r.possibleStaking.push({ contract: contractAddr, info }); } } });
-    }
-    renderLPResults(rows);
-    return rows;
-  };
-})();
-</script>
-<!-- END: LP detection module injected -->
 </body>
 </html>
+
+
+<!-- =================================== -->
+<!-- ========== cf-worker.js ============ -->
+<!-- =================================== -->
+/**
+ * Cloudflare Worker proxy for scan APIs & price endpoints
+ * Usage: deploy and set route to your domain; in index.html, toggle "via proxy".
+ */
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if(url.pathname === '/proxy'){
+      const target = url.searchParams.get('url');
+      if(!target) return new Response('Missing url', {status:400});
+      const upstream = new Request(target, { headers: { 'user-agent': request.headers.get('user-agent')||'' } });
+      const resp = await fetch(upstream);
+      // CORS open to caller origin
+      const h = new Headers(resp.headers);
+      h.set('access-control-allow-origin', url.origin);
+      h.set('access-control-allow-credentials','true');
+      return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
+    }
+    return new Response('OK', {status:200});
+  }
+}
+
+
+<!-- ============================== -->
+<!-- ========== sw.js ============= -->
+<!-- ============================== -->
+const CACHE = 'defi-inspector-static-v1';
+self.addEventListener('install', (e)=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html']))); });
+self.addEventListener('activate', (e)=>{ e.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', (e)=>{
+  const url = new URL(e.request.url);
+  if(url.pathname.startsWith('/proxy')){ // network-first, then stale
+    e.respondWith((async()=>{
+      try{ const res = await fetch(e.request); const c=await caches.open('defi-inspector-v1'); if(res.ok) c.put(e.request,res.clone()); return res; }catch{ const hit = await caches.match(e.request); return hit || new Response('offline', {status:503}); }
+    })());
+    return;
+  }
+  // static: stale-while-revalidate
+  e.respondWith((async()=>{
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(e.request);
+    const net = fetch(e.request).then(res=>{ try{ if(res.ok) cache.put(e.request,res.clone()); }catch{} return res; });
+    return hit || net;
+  })());
+});
