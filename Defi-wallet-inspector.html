@@ -181,7 +181,6 @@
       default: return 'https://cloudflare-eth.com';
     }
   }
-  }
 
   async function fetchExplorer(module, action, chainKey, params, apiKey){
     const base = CHAIN[chainKey].explorer;
@@ -334,7 +333,7 @@ $('jsonOut').textContent = JSON.stringify(report, null, 2);
     }
   }
 
-  $('btnInspect').addEventListener('click', onInspect);
+  document.addEventListener('DOMContentLoaded', ()=>{ const b=$('btnInspect'); if(b){ b.addEventListener('click', onInspect); } });
 })();
 </script>
 <!-- START: LP detection module injected -->
