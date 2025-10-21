@@ -33,7 +33,7 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .code{background:#0f1216;border:1px solid #1f2430;border-radius:10px;padding:10px;font-size:12px;overflow:auto}
   </style>
-  <!-- Ethers v6 CDN -->
+  <!-- Ethers v6 CDN (UMD) -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
@@ -41,7 +41,7 @@
     <header class="grid cols-2" style="align-items:center">
       <div>
         <h1 style="margin:0 0 6px 0;font-size:28px">DeFi Wallet Inspector</h1>
-        <p class="muted" style="margin:0">Saisis une adresse et récupère les éléments depuis les exploreurs (aucun backend).</p>
+        <p class="muted" style="margin:0">Saisis une adresse et récupère les éléments depuis les exploreurs (aucun backend). <em>Heure affichée : locale du navigateur.</em></p>
       </div>
       <div class="row" style="justify-content:flex-end">
         <button id="btnExportJSON" class="secondary" disabled>Exporter JSON</button>
@@ -53,7 +53,7 @@
       <div class="grid cols-3">
         <div>
           <label>Adresse du wallet (EVM)</label>
-          <input id="inpAddress" placeholder="0x..." spellcheck="false" class="mono" />
+          <input id="inpAddress" placeholder="0x742d35Cc6634C0532925a3b844Bc454e4438f44e (exemple)" spellcheck="false" class="mono" />
         </div>
         <div>
           <label>Chaîne</label>
@@ -74,7 +74,7 @@
       <div class="grid cols-2" style="margin-top:12px">
         <div>
           <label>RPC (optionnel — lecture du solde natif)</label>
-          <input id="inpRpc" placeholder="https://mainnet.infura.io/v3/… (ou laisser vide)" />
+          <input id="inpRpc" placeholder="https://cloudflare-eth.com (ou laisser vide)" />
         </div>
         <div>
           <label>&nbsp;</label>
@@ -134,6 +134,21 @@
       <div class="footer">Ce JSON inclut: balance natif, transferts ERC‑20 agrégés, transactions (max 100), et métadonnées de la chaîne.</div>
     </section>
 
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Console</h3>
+      <pre id="debugOut" class="code" style="max-height:220px">Prête.</pre>
+      <div class="footer">Si le bouton ne fait rien, regarde ici les messages d'erreur.</div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Tests</h3>
+      <div class="row">
+        <button id="btnRunTests" class="secondary">Exécuter tests (smoke)</button>
+      </div>
+      <pre id="testOut" class="code" style="max-height:240px">Aucun test lancé.</pre>
+      <div class="footer">Tests de base: validation adresse & lecture du solde natif via RPC pour plusieurs chaînes. Ils ne garantissent pas la disponibilité des exploreurs.</div>
+    </section>
+
     <p class="footer">⚠️ Ceci n'est pas un conseil financier. Prototype éducatif. Les API publiques peuvent limiter ou bloquer des requêtes depuis le navigateur (CORS/rate‑limit). Fournir sa propre clé API et/ou passer via un proxy serveur peut être nécessaire pour un usage intensif.</p>
   </div>
 
@@ -142,6 +157,9 @@
   const $ = (id)=>document.getElementById(id);
   const state = { last: null };
 
+  const log = (...args)=>{ try{ const el = $('debugOut'); if(!el) return; const line = args.map(x=> typeof x==='string'? x : JSON.stringify(x)).join(' '); el.textContent += `\n`+ line; }catch(e){} };
+  log('[init] script chargé');
+
   const CHAIN = {
     eth: { name:'Ethereum', symbol:'ETH', explorer:'https://api.etherscan.io/api', unit:18, scan:'https://etherscan.io' },
     polygon: { name:'Polygon', symbol:'MATIC', explorer:'https://api.polygonscan.com/api', unit:18, scan:'https://polygonscan.com' },
@@ -149,6 +167,15 @@
     arbitrum: { name:'Arbitrum One', symbol:'ETH', explorer:'https://api.arbiscan.io/api', unit:18, scan:'https://arbiscan.io' },
     optimism: { name:'Optimism', symbol:'ETH', explorer:'https://api-optimistic.etherscan.io/api', unit:18, scan:'https://optimistic.etherscan.io' },
   };
+
+  // --- utils ---
+  const isArr = Array.isArray;
+  function safeArray(x){
+    if(isArr(x)) return x;
+    if(x && isArr(x.result)) return x.result;
+    if(x && typeof x === 'object') return Object.values(x).filter(v=> v != null);
+    return [];
+  }
 
   function fmt(n, digits=6){
     if(n === null || n === undefined || isNaN(n)) return '—';
@@ -161,14 +188,12 @@
 
   async function getNativeBalance(addr, chainKey, rpcUrl){
     try{
-      const provider = rpcUrl ? new ethers.BrowserProvider(new ethers.JsonRpcProvider(rpcUrl)) : new ethers.BrowserProvider(window.ethereum || new ethers.JsonRpcProvider(getDefaultRPC(chainKey)));
-      // ethers v6: if provider is BrowserProvider from jsonrpc, need signer? Instead use JsonRpcProvider directly.
-    }catch(e){ /* ignore */ }
-    try{
-      const provider = new ethers.JsonRpcProvider(rpcUrl || getDefaultRPC(chainKey));
+      const url = rpcUrl || getDefaultRPC(chainKey);
+      log('[rpc] using', url);
+      const provider = new ethers.JsonRpcProvider(url);
       const bal = await provider.getBalance(addr);
       return Number(ethers.formatEther(bal));
-    }catch(e){ return null; }
+    }catch(e){ log('[rpc:error]', e.message||e); return null; }
   }
 
   function getDefaultRPC(chainKey){
@@ -182,6 +207,10 @@
     }
   }
 
+  // Expose pour le module LP
+  window.getDefaultRPC = getDefaultRPC;
+  window.state = state;
+
   async function fetchExplorer(module, action, chainKey, params, apiKey){
     const base = CHAIN[chainKey].explorer;
     const url = new URL(base);
@@ -189,20 +218,24 @@
     url.searchParams.set('action', action);
     Object.entries(params||{}).forEach(([k,v])=> url.searchParams.set(k, v));
     if(apiKey) url.searchParams.set('apikey', apiKey);
-    const res = await fetch(url.toString());
+    log('[scan] GET', url.toString());
+    const res = await fetch(url.toString()).catch(err=>{ throw new Error('Fetch fail: '+(err.message||err)); });
     if(!res.ok) throw new Error('Explorer HTTP '+res.status);
     const json = await res.json();
-    if(json.status === '0' && json.message && json.result) {
-      // Etherscan style errors
-      console.warn('Explorer:', json.message, json.result);
+    if(json.status === '0' && typeof json.result === 'string'){
+      log('[scan:error]', json.message || 'error', json.result);
+      throw new Error(json.result);
     }
-    return json.result || [];
+    if(json.status === '0' && json.message && json.result) {
+      log('[scan:warn]', json.message, json.result);
+    }
+    return safeArray(json.result);
   }
 
   function aggregateTokenTransfers(transfers, address){
     const lower = (address||'').toLowerCase();
     const map = new Map();
-    for(const t of (transfers||[])){
+    for(const t of safeArray(transfers)){
       const ca = (t && t.contractAddress) ? String(t.contractAddress).toLowerCase() : null;
       const to = (t && t.to) ? String(t.to).toLowerCase() : '';
       const from = (t && t.from) ? String(t.from).toLowerCase() : '';
@@ -215,8 +248,9 @@
     }
     const rows = [];
     for(const v of map.values()){
-      const net = v.rawIn - v.rawOut;
-      let balanceFmt = NaN; try{ balanceFmt = Number(net) / (10 ** (isFinite(v.decimals)? v.decimals : 18)); }catch(e){}
+      const net = v.rawIn - v.rawOut; // BigInt
+      let balanceFmt = NaN;
+      try{ balanceFmt = Number(ethers.formatUnits(net, isFinite(v.decimals)? v.decimals : 18)); }catch(e){}
       rows.push({ token: v.symbol || 'UNK', contract: v.contract, decimals: isFinite(v.decimals)? v.decimals : 18, balance_raw: net.toString(), balance_fmt: balanceFmt });
     }
     return rows.sort((a,b)=> (b.balance_fmt||0)-(a.balance_fmt||0));
@@ -224,7 +258,7 @@
 
   function renderTokens(rows){
     const tbody = $('tblTokens').querySelector('tbody');
-    tbody.innerHTML = rows.map(r=>{
+    tbody.innerHTML = safeArray(rows).map(r=>{
       const bal = isFinite(r.balance_fmt) ? fmt(r.balance_fmt, 6) : r.balance_raw;
       return `<tr>
         <td><strong>${escapeHtml(r.token)}</strong></td>
@@ -239,7 +273,8 @@
     const tbody = $('tblTxs').querySelector('tbody');
     const scan = CHAIN[chainKey].scan;
     const short = (s)=>{ s = (s||''); return s.length>16 ? `${s.slice(0,8)}…${s.slice(-6)}` : s; };
-    tbody.innerHTML = (txs||[]).map(t=>{
+    const list = safeArray(txs);
+    tbody.innerHTML = list.map(t=>{
       const hash = t.hash || t.txhash || t.transactionHash || '';
       const link = hash ? `${scan}/tx/${hash}` : '#';
       const from = t.from || '';
@@ -256,15 +291,15 @@
         <td class="mono">${t.blockNumber ?? '—'}</td>
       </tr>`;
     }).join('');
-  }).join('');
   }
 
-  function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c])); }
 
   function enableExports(data){
     const btnJ = $('btnExportJSON');
     const btnC = $('btnExportCSV');
-    btnJ.disabled = btnC.disabled = false;
+    btnJ.disabled = false;
+    btnC.disabled = !(Array.isArray(data.tokens) && data.tokens.length>0);
     btnJ.onclick = ()=> downloadBlob(JSON.stringify(data,null,2), 'wallet_report.json', 'application/json');
     btnC.onclick = ()=> downloadBlob(toCSV(data), 'wallet_tokens.csv', 'text/csv');
   }
@@ -278,7 +313,7 @@
   }
 
   function toCSV(data){
-    const rows = data.tokens || [];
+    const rows = safeArray(data.tokens);
     const head = ['token','contract','decimals','balance_raw','balance_fmt'];
     const csv = [head.join(',')].concat(rows.map(r=> head.map(k=> JSON.stringify(r[k]??'')).join(',')));
     return csv.join('\n');
@@ -295,19 +330,26 @@
     $('btnInspect').disabled = true; $('btnSpin').style.display='inline-block'; $('btnText').textContent = 'Chargement…';
 
     try{
+      log('[inspect] start', {addr, chainKey});
       const chain = CHAIN[chainKey];
 
       // 1) Solde natif via RPC
       const native = await getNativeBalance(addr, chainKey, rpc);
 
       // 2) Transactions récentes via *scan (desc, max 100)
-      const txs = await fetchExplorer('account','txlist', chainKey, { address: addr, startblock:0, endblock:99999999, page:1, offset:100, sort:'desc' }, apiKey).catch(e=>{ console.warn(e); return []; });
+      let txs = [];
+      try{ txs = await fetchExplorer('account','txlist', chainKey, { address: addr, startblock:0, endblock:99999999, page:1, offset:100, sort:'desc' }, apiKey); }
+      catch(e){ log('[scan:txlist:error]', e.message||e); }
+      txs = safeArray(txs).slice(0,100);
 
       // 3) Transferts ERC20 pour heuristique de solde
-      const transfers = await fetchExplorer('account','tokentx', chainKey, { address: addr, page:1, offset:100 }, apiKey).catch(e=>{ console.warn(e); return []; });
+      let transfers = [];
+      try{ transfers = await fetchExplorer('account','tokentx', chainKey, { address: addr, page:1, offset:100 }, apiKey); }
+      catch(e){ log('[scan:tokentx:error]', e.message||e); }
+      transfers = safeArray(transfers);
       const tokens = aggregateTokenTransfers(transfers, addr);
 
-      const report = { chain: chain.name, chain_key: chainKey, address: addr, native_balance: native, native_symbol: chain.symbol, tokens, txs: txs.slice(0,100), generated_at: new Date().toISOString() };
+      const report = { chain: chain.name, chain_key: chainKey, address: addr, native_balance: native, native_symbol: chain.symbol, tokens, txs, generated_at: new Date().toISOString() };
 
       // Render KPIs
       $('kpiChain').textContent = chain.name;
@@ -318,24 +360,86 @@
       renderTokens(tokens);
       renderTxs(txs, chainKey);
 
-      // Détection des positions LP et adresses de retrait (Uniswap V2-like)
-await (window.detectLPPositions ? detectLPPositions(report, rpc) : Promise.resolve());
+      // Ajuster l'intitulé de la colonne Valeur en fonction de la chaîne
+      const thVal = document.querySelector('#tblTxs thead th:nth-child(5)');
+      if(thVal){ thVal.textContent = `Valeur (${chain.symbol})`; }
 
-// JSON
-$('jsonOut').textContent = JSON.stringify(report, null, 2);
+      // Détection LP
+      if(window.detectLPPositions){
+        try{ await detectLPPositions(report, rpc); log('[lp] done'); }
+        catch(e){ log('[lp:error]', e.message||e); }
+      }
 
-      // enable export
+      // JSON
+      $('jsonOut').textContent = JSON.stringify(report, null, 2);
       enableExports(report);
       state.last = report;
+      log('[inspect] done');
     }catch(e){
       console.error(e);
+      log('[inspect:error]', e.message||e);
       alert('Erreur: '+ (e.message||e));
     }finally{
       $('btnInspect').disabled = false; $('btnSpin').style.display='none'; $('btnText').textContent = 'Inspecter';
     }
   }
 
-  document.addEventListener('DOMContentLoaded', ()=>{ const b=$('btnInspect'); if(b){ b.addEventListener('click', onInspect); } });
+  // --- tests ---
+  async function runTests(){
+    const out = $('testOut');
+    const lines = [];
+    function push(msg){ lines.push(msg); out.textContent = lines.join('\n'); }
+
+    // Smoke tests lecture RPC
+    const samples = [
+      { chain:'eth', addr:'0x742d35Cc6634C0532925a3b844Bc454e4438f44e' }, // Whale wallet
+      { chain:'polygon', addr:'0x0000000000000000000000000000000000001010' }, // MATIC token contract (lecture RPC ok)
+      { chain:'bsc', addr:'0x0000000000000000000000000000000000000000' }, // zero addr
+    ];
+
+    push('Démarrage smoke tests RPC...');
+    for(const s of samples){
+      try{
+        push(`→ Test ${s.chain} ${s.addr.slice(0,10)}…`);
+        const bal = await getNativeBalance(s.addr, s.chain);
+        push(`   Solde natif lu: ${bal!==null? bal : 'null'} (OK)`);
+      }catch(e){
+        push(`   [ERREUR] ${e.message||e}`);
+      }
+    }
+
+    // Tests unitaires safeArray / renderTxs normalization
+    push('Tests normalisation de tableaux...');
+    const weirds = [null, undefined, {}, {result:[]}, {a:1,b:2}, 'oops', 123, [{hash:'0x1'}]];
+    for(const w of weirds){
+      try{
+        const arr = safeArray(w);
+        if(!Array.isArray(arr)) throw new Error('safeArray did not return array');
+        // simulate render
+        renderTxs(arr, 'eth');
+        push(`   ok: input=${typeof w} → length=${arr.length}`);
+      }catch(e){
+        push(`   [ERREUR normalize] ${e.message||e}`);
+      }
+    }
+
+    push('Tests terminés.');
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const b = $('btnInspect'); if(b){ b.addEventListener('click', onInspect); log('[dom] bouton prêt'); }
+    const tb = $('btnRunTests'); if(tb){ tb.addEventListener('click', runTests); }
+    // Ouvrir les contrats token dans l'explorer
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest('a[data-contract]');
+      if(!a) return;
+      e.preventDefault();
+      const c = a.getAttribute('data-contract');
+      const chainKey = document.getElementById('selChain').value;
+      const url = CHAIN[chainKey].scan + '/token/' + c;
+      window.open(url, '_blank', 'noopener');
+    });
+  });
 })();
 </script>
 <!-- START: LP detection module injected -->
@@ -395,7 +499,7 @@ $('jsonOut').textContent = JSON.stringify(report, null, 2);
   async function tryDecimals(provider, token){ try{ const c = new ethers.Contract(token, ["function decimals() view returns (uint8)"], provider); return Number(await c.decimals()); }catch(e){ return 18; } }
   async function detectSentLPToContracts(txs, lpContracts, provider, walletLower){
     const candidates = new Map();
-    for(const t of txs){
+    for(const t of (Array.isArray(txs)? txs : [])){
       const k = (t.contractAddress||'').toLowerCase(); if(!k || !lpContracts.has(k)) continue;
       if((t.from||'').toLowerCase() === walletLower){
         const to = (t.to||'').toLowerCase();
@@ -410,7 +514,7 @@ $('jsonOut').textContent = JSON.stringify(report, null, 2);
     if(!el){ el = document.createElement('section'); el.id='lpResultsCard'; el.className='card'; el.style.marginTop='16px'; el.innerHTML = '<h3 style="margin:0 0 10px">Positions LP détectées</h3><div style="overflow:auto"><table id="tblLPs"><thead><tr><th>Pair (contrat)</th><th>Token0</th><th>Token1</th><th>LP détenue</th><th>Sous-jacent token0</th><th>Sous-jacent token1</th><th>Retirer depuis</th></tr></thead><tbody></tbody></table></div>'; const anchor = document.getElementById('jsonOut').parentElement; document.querySelector('.container').insertBefore(el, anchor); }
     const tbody = document.querySelector('#tblLPs tbody');
     const chainKey = (window.state && window.state.last && window.state.last.chain_key) || (document.getElementById('selChain')?.value || 'eth');
-    tbody.innerHTML = rows.map(r=>{
+    tbody.innerHTML = (Array.isArray(rows)? rows : []).map(r=>{
       const token0 = r.token0.slice(0,8)+'…'+r.token0.slice(-6);
       const token1 = r.token1.slice(0,8)+'…'+r.token1.slice(-6);
       const pair = r.pair;
@@ -425,11 +529,12 @@ $('jsonOut').textContent = JSON.stringify(report, null, 2);
   }
   window.detectLPPositions = async function(report, rpcUrl){
     const chain = (report.chain_key || 'eth');
-    const provider = new ethers.JsonRpcProvider(rpcUrl || (window.getDefaultRPC ? getDefaultRPC(chain) : undefined));
+    const fallback = (typeof getDefaultRPC === 'function') ? getDefaultRPC(chain) : 'https://cloudflare-eth.com';
+    const provider = new ethers.JsonRpcProvider(rpcUrl || fallback);
     const wallet = report.address; const walletLower = wallet.toLowerCase();
-    const tokenContracts = (report.tokens||[]).map(t=> (t.contract||'').toLowerCase()).filter(Boolean);
+    const tokenContracts = (Array.isArray(report.tokens)? report.tokens : []).map(t=> (t.contract||'').toLowerCase()).filter(Boolean);
     const tokenSet = new Set(tokenContracts);
-    const txs = report.txs || [];
+    const txs = Array.isArray(report.txs) ? report.txs : [];
     const lpFound = []; const lpSet = new Set();
     for(const c of tokenSet){ try{ if(await isPairContract(provider, c)){ const info = await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ info.decimalsLP=18; lpFound.push(info); lpSet.add(c); } } }catch(e){} }
     for(const t of txs){ const c=(t.contractAddress||'').toLowerCase(); if(!c || lpSet.has(c)) continue; try{ if(await isPairContract(provider, c)){ const info=await inspectPair(provider, c, wallet); if(info && BigInt(info.balanceLP||'0')>0n){ lpFound.push(info); lpSet.add(c); } } }catch(e){} }
